@@ -7,6 +7,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.opentelemetry.io/contrib/instrumentation/go.mongodb.org/mongo-driver/mongo/otelmongo"
 )
 
 // Connection represents a connection to MongoDB.
@@ -16,36 +17,67 @@ type Connection struct {
 	timeout  time.Duration
 }
 
+// connectionOptions holds configuration for MongoDB connection
+type connectionOptions struct {
+	enableTracing bool
+	timeout       *time.Duration
+	serverAPI     *string
+}
+
 // ConnectionOption is a function that configures connection options.
-type ConnectionOption func(opts *options.ClientOptions)
+type ConnectionOption func(opts *connectionOptions)
 
 // WithTimeout sets the connection timeout.
 func WithTimeout(d time.Duration) ConnectionOption {
-	return func(opts *options.ClientOptions) {
-		opts.SetConnectTimeout(d)
+	return func(opts *connectionOptions) {
+		opts.timeout = &d
 	}
 }
 
 // WithServerAPI sets the server API version.
 func WithServerAPI(version string) ConnectionOption {
-	return func(opts *options.ClientOptions) {
-		opts.SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1))
+	return func(opts *connectionOptions) {
+		opts.serverAPI = &version
+	}
+}
+
+// WithTracing turns on/off tracing through otelmongo
+func WithTracing(enable bool) ConnectionOption {
+	return func(opts *connectionOptions) {
+		opts.enableTracing = enable
 	}
 }
 
 // NewConnection creates a new connection to MongoDB.
 func NewConnection(ctx context.Context, uri string, dbName string, opts ...ConnectionOption) (ConnectionManager, error) {
 	clientOpts := options.Client().ApplyURI(uri)
-
-	// Apply default timeout
-	WithTimeout(DefaultConnectionTimeout)(clientOpts)
-
-	// Apply custom options
+	
+	// Apply default options
+	connOpts := &connectionOptions{
+		enableTracing: true, // default is true
+	}
+	
 	for _, opt := range opts {
-		if opt == nil {
-			continue
+		if opt != nil {
+			opt(connOpts)
 		}
-		opt(clientOpts)
+	}
+	
+	// Apply tracing if enabled
+	if connOpts.enableTracing {
+		clientOpts.SetMonitor(otelmongo.NewMonitor())
+	}
+	
+	// Apply timeout
+	if connOpts.timeout != nil {
+		clientOpts.SetConnectTimeout(*connOpts.timeout)
+	} else {
+		clientOpts.SetConnectTimeout(DefaultConnectionTimeout)
+	}
+	
+	// Apply server API
+	if connOpts.serverAPI != nil {
+		clientOpts.SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1))
 	}
 
 	client, err := mongo.Connect(ctx, clientOpts)

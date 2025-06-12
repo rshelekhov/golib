@@ -1,6 +1,6 @@
 # MongoDB wrapper
 
-MongoDB database client with transaction management.
+MongoDB database client with transaction management and OpenTelemetry tracing support.
 
 ## Features
 
@@ -8,20 +8,27 @@ MongoDB database client with transaction management.
 - Transaction management
 - Session handling
 - Server API version support
+- OpenTelemetry tracing integration (otelmongo)
 - Interface-based design for better abstraction
 
 ## Usage
 
 ```go
-// Create connection
+// Create connection with tracing enabled (default)
 conn, err := mongo.NewConnection(ctx, "mongodb://localhost:27017", "mydb",
     mongo.WithTimeout(time.Second*5),
     mongo.WithServerAPI("1"),
+    mongo.WithTracing(true), // can be omitted, default is true
 )
 if err != nil {
     log.Fatal(err)
 }
 defer conn.Close(ctx)
+
+// Create connection with tracing disabled
+conn, err := mongo.NewConnection(ctx, "mongodb://localhost:27017", "mydb",
+    mongo.WithTracing(false), // disable tracing
+)
 
 // Create transaction manager
 txManager := mongo.NewTransactionManager(conn)
@@ -49,5 +56,6 @@ err = txManager.RunTransaction(ctx, func(ctx context.Context) error {
 
 ## Connection Options
 
-- `WithTimeout` - Sets the connection timeout
-- `WithServerAPI` - Sets the server API version
+- `WithTimeout(duration)` - Sets the connection timeout
+- `WithServerAPI(version)` - Sets the server API version
+- `WithTracing(bool)` - Enables/disables OpenTelemetry tracing (default: true)
