@@ -1,0 +1,19 @@
+# Автоматическая настройка datasources для Grafana
+
+apiVersion: 1
+
+datasources:
+  # Prometheus - для метрик
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+
+  # Jaeger - для трейсов
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    editable: true

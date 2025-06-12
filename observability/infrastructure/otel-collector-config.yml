@@ -1,0 +1,87 @@
+# OpenTelemetry Collector Configuration
+# Центральный компонент для приема, обработки и экспорта всех observability сигналов
+
+receivers:
+  # OTLP receiver - принимает данные от приложений
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+  # Prometheus receiver - скрейпит метрики (опционально)
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "demo-app"
+          static_configs:
+            - targets: ["demo-app:8080"]
+
+processors:
+  # Batch processor - группирует данные для эффективной отправки
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Memory limiter - защита от OOM
+  memory_limiter:
+    limit_mib: 512
+
+  # Resource processor - добавляет метаданные
+  resource:
+    attributes:
+      - key: environment
+        value: docker
+        action: upsert
+
+exporters:
+  # Jaeger exporter - отправляет трейсы в Jaeger
+  jaeger:
+    endpoint: jaeger:14250
+    tls:
+      insecure: true
+
+  # Prometheus exporter - экспортирует метрики для Prometheus
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    const_labels:
+      environment: docker
+
+  # Loki exporter - отправляет логи в Loki
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    tenant_id: "tenant1"
+
+  # OTLP exporter для Tempo (альтернатива Jaeger)
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  # Logging exporter - для отладки (выводит в консоль)
+  logging:
+    loglevel: debug
+
+service:
+  pipelines:
+    # Pipeline для трейсов
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, resource]
+      exporters: [jaeger, otlp/tempo, logging]
+
+    # Pipeline для метрик
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [memory_limiter, batch, resource]
+      exporters: [prometheus, logging]
+
+    # Pipeline для логов
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, resource]
+      exporters: [loki, logging]
+
+  extensions: []

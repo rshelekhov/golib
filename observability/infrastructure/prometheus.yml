@@ -1,0 +1,47 @@
+# Prometheus Configuration
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Правила для алертов (опционально)
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus сам себя
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # OpenTelemetry Collector metrics
+  - job_name: "otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8888", "otel-collector:8889"]
+    scrape_interval: 10s
+    metrics_path: /metrics
+
+  # Demo приложение (если использует Prometheus exporter напрямую)
+  - job_name: "demo-app-prometheus"
+    static_configs:
+      - targets: ["demo-app:8080"]
+    metrics_path: /metrics
+    scrape_interval: 5s
+
+  # Jaeger metrics
+  - job_name: "jaeger"
+    static_configs:
+      - targets: ["jaeger:14269"]
+    metrics_path: /metrics
+
+  # Grafana metrics
+  - job_name: "grafana"
+    static_configs:
+      - targets: ["grafana:3000"]
+    metrics_path: /metrics
+# Alertmanager configuration (опционально)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#           - alertmanager:9093
