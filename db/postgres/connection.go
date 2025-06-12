@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/exaring/otelpgx"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -18,6 +19,7 @@ type connectionPoolOptions struct {
 	minConnectionsCount int32
 	maxConnectionsCount int32
 	tlsConfig           *tls.Config
+	EnableTracing       bool
 }
 
 // ConnectionPoolOption is a function that configures connection pool options.
@@ -58,6 +60,13 @@ func WithTLS(cfg *tls.Config) ConnectionPoolOption {
 	}
 }
 
+// WithTracing turns on/off tracing through otelpgx
+func WithTracing(enable bool) ConnectionPoolOption {
+	return func(opts *connectionPoolOptions) {
+		opts.EnableTracing = enable
+	}
+}
+
 // Connection represents a connection pool to the database.
 type Connection struct {
 	pool *pgxpool.Pool
@@ -89,6 +98,7 @@ func NewConnectionPool(ctx context.Context, connString string, opts ...Connectio
 		maxConnLifeTime:     maxConnLifeTimeDefault,
 		minConnectionsCount: minConnectionsCountDefault,
 		maxConnectionsCount: maxConnectionsCountDefault,
+		EnableTracing:       true, // default is true
 	}
 	for _, opt := range opts {
 		opt(options)
@@ -100,6 +110,10 @@ func NewConnectionPool(ctx context.Context, connString string, opts ...Connectio
 	connConfig.MinConns = options.minConnectionsCount
 	connConfig.MaxConns = options.maxConnectionsCount
 	connConfig.ConnConfig.Config.TLSConfig = options.tlsConfig
+
+	if options.EnableTracing {
+		connConfig.ConnConfig.Tracer = otelpgx.NewTracer()
+	}
 
 	// connect to database
 	p, err := pgxpool.NewWithConfig(ctx, connConfig)

@@ -14,15 +14,15 @@ PostgreSQL database client with transaction management.
 ## Usage
 
 ```go
-// Create connection pool
-conn, err := pgx.NewConnectionPool(ctx, "postgres://user:pass@localhost:5432/dbname")
+// Create connection pool with tracing disabled
+conn, err := pgxv5.NewConnectionPool(ctx, "postgres://user:pass@localhost:5432/dbname", pgxv5.WithTracing(false))
 if err != nil {
     log.Fatal(err)
 }
 defer conn.Close()
 
 // Create transaction manager
-txManager := pgx.NewTransactionManager(conn)
+txManager := pgxv5.NewTransactionManager(conn)
 
 // Run transaction with ReadCommitted isolation level
 err = txManager.RunReadCommitted(ctx, func(txCtx context.Context) error {
