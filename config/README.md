@@ -1,14 +1,15 @@
 # Config Loader
 
-Simple and flexible configuration loader for Go applications using Viper.
+Flexible configuration loader for Go with auto-discovery and multiple formats.
 
 ## Features
 
-- Generic type support
+- Generic type for any config struct
+- Auto-discovery of config files
+- YAML and .env file support
+- Multiple config files merging
+- Flag-based config path override
 - Environment variables integration
-- Config file support
-- Flexible Viper configuration through options
-- Kubernetes-friendly (works with ConfigMaps and Secrets)
 
 ## Installation
 
@@ -21,72 +22,99 @@ go get github.com/rshelekhov/golib/config
 ### Basic Usage
 
 ```go
-package main
-
-import (
-    "github.com/rshelekhov/golib/config"
-)
-
 type AppConfig struct {
-    AppEnv string `mapstructure:"APP_ENV"`
-    AppID  string `mapstructure:"APP_ID"`
-    Port   int    `mapstructure:"PORT"`
+    AppEnv string `yaml:"app_env"`
+    Port   int    `yaml:"port"`
 }
 
-func main() {
-    cfg := config.MustLoad[AppConfig]()
-    // Use cfg...
-}
+cfg := config.MustLoad[AppConfig]()
 ```
 
-### With Options
+Auto-discovers config files:
 
-```go
-cfg := config.MustLoad[AppConfig](
-    config.WithEnvPrefix("MYAPP"),     // Environment variables will be prefixed with MYAPP_
-    config.WithConfigType("yaml"),     // Set config file type
-    config.WithConfigName("config"),   // Set config file name
-)
-```
+- `config.yaml|yml`, `.env` (current directory)
+- `config/config.yaml|yml`, `config/.env` (config subdirectory)
+- `../config/config.yaml|yml`, `../config/.env` (parent directory)
 
-### Configuration Sources
+### Config Files
 
-1. Environment Variables:
-
-```bash
-export APP_ENV=production
-export APP_ID=myapp
-export PORT=8080
-```
-
-2. Config File (e.g., config.yaml):
+**YAML:**
 
 ```yaml
 app_env: production
-app_id: myapp
 port: 8080
+database:
+  host: localhost
+  port: 5432
 ```
 
-Load config file by:
+**.env:**
 
-- Setting CONFIG_PATH environment variable
-- Using -config flag: `./app -config ./config.yaml`
+```env
+APP_ENV=production
+PORT=8080
+DATABASE_HOST=localhost
+DATABASE_PORT=5432
+```
 
-### Field Tags
+### Configuration Priority
 
-Use `mapstructure` tag to map config values to struct fields:
+1. Command-line flag: `./app -config ./config.yaml`
+2. Environment variable: `CONFIG_PATH=/path/to/config.yaml`
+3. Explicit files via `WithFiles()`
+4. Auto-discovered files
+
+### Options
+
+```go
+cfg := config.MustLoad[AppConfig](
+    config.WithFiles([]string{"base.yaml", "override.env"}),
+    config.WithMergeFiles(true),
+    config.WithSearchPaths([]string{"./custom/*.yaml"}),
+    config.WithAllowUnknownFields(false),
+)
+```
+
+**Available Options:**
+
+- `WithFiles([]string)` - explicit config files
+- `WithMergeFiles(bool)` - merge multiple files (default: true)
+- `WithSearchPaths([]string)` - custom search paths
+- `WithAllowUnknownFields(bool)` - allow unknown fields (default: true)
+- `WithSkipFlags(bool)` - skip CLI flags parsing (default: true)
+
+### Struct Tags
 
 ```go
 type Config struct {
-    DatabaseURL string `mapstructure:"DATABASE_URL"`
-    RedisHost   string `mapstructure:"REDIS_HOST"`
-    Debug       bool   `mapstructure:"DEBUG"`
+    DatabaseURL string `yaml:"database_url"`
+    Debug       bool   `yaml:"debug"`
+
+    Database struct {
+        Host string `yaml:"host"`
+        Port int    `yaml:"port"`
+    } `yaml:"database"`
 }
 ```
 
-### Kubernetes Integration
+### Kubernetes
 
-In Kubernetes, all settings come through environment variables from ConfigMap and Secret, so config files are only needed for local development.
+**Local development:**
+
+```go
+cfg := config.MustLoad[MyConfig]() // finds .env automatically
+```
+
+**Kubernetes with mounted ConfigMap:**
+
+```go
+cfg := config.MustLoad[MyConfig](
+    config.WithSearchPaths([]string{
+        "/etc/config/config.yaml", // mounted ConfigMap
+        "/etc/secrets/.env",       // mounted Secret
+    }),
+)
+```
 
 ## License
 
