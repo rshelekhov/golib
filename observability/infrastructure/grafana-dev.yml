@@ -1,9 +1,9 @@
-# Автоматическая настройка datasources для Grafana
+# Automatic datasources configuration for Grafana
 
 apiVersion: 1
 
 datasources:
-  # Prometheus - для метрик
+  # Prometheus - for metrics
   - name: Prometheus
     type: prometheus
     access: proxy
@@ -11,7 +11,7 @@ datasources:
     isDefault: true
     editable: true
 
-  # Jaeger - для трейсов
+  # Jaeger - for traces
   - name: Jaeger
     type: jaeger
     access: proxy

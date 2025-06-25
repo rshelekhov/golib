@@ -1,10 +1,10 @@
 version: "3.8"
 
-# Упрощенная версия для локальной разработки
-# Только основные компоненты без избыточности
+# Simplified version for local development
+# Only essential components without redundancy
 
 services:
-  # OpenTelemetry Collector - центральная точка сбора
+  # OpenTelemetry Collector - central collection point
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     container_name: otel-collector-dev
@@ -12,12 +12,12 @@ services:
     volumes:
       - ./otel-collector-dev.yml:/etc/otel-collector-config.yml
     ports:
-      - "4317:4317" # OTLP gRPC - ваше приложение подключается сюда
+      - "4317:4317" # OTLP gRPC - your application connects here
       - "4318:4318" # OTLP HTTP
     networks:
       - observability
 
-  # Jaeger - для просмотра трейсов
+  # Jaeger - for viewing traces
   jaeger:
     image: jaegertracing/all-in-one:latest
     container_name: jaeger-dev
@@ -28,7 +28,7 @@ services:
     networks:
       - observability
 
-  # Prometheus - для метрик
+  # Prometheus - for metrics
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus-dev
@@ -43,7 +43,7 @@ services:
     networks:
       - observability
 
-  # Grafana - единый интерфейс для всего
+  # Grafana - unified interface for everything
   grafana:
     image: grafana/grafana:latest
     container_name: grafana-dev
@@ -63,10 +63,10 @@ services:
 networks:
   observability:
     driver: bridge
-# Как использовать:
+# How to use:
 # 1. docker-compose -f docker-compose.dev.yml up -d
-# 2. В вашем приложении: OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-# 3. Открыть:
+# 2. In your application: OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+# 3. Open:
 #    - Grafana: http://localhost:3000 (admin/admin)
 #    - Jaeger: http://localhost:16686
 #    - Prometheus: http://localhost:9090

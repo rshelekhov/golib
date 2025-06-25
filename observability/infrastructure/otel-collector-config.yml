@@ -1,8 +1,8 @@
 # OpenTelemetry Collector Configuration
-# Центральный компонент для приема, обработки и экспорта всех observability сигналов
+# Central component for receiving, processing and exporting all observability signals
 
 receivers:
-  # OTLP receiver - принимает данные от приложений
+  # OTLP receiver - receives data from applications
   otlp:
     protocols:
       grpc:
@@ -10,7 +10,7 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
-  # Prometheus receiver - скрейпит метрики (опционально)
+  # Prometheus receiver - scrapes metrics (optional)
   prometheus:
     config:
       scrape_configs:
@@ -19,17 +19,17 @@ receivers:
             - targets: ["demo-app:8080"]
 
 processors:
-  # Batch processor - группирует данные для эффективной отправки
+  # Batch processor - groups data for efficient sending
   batch:
     timeout: 1s
     send_batch_size: 1024
     send_batch_max_size: 2048
 
-  # Memory limiter - защита от OOM
+  # Memory limiter - protection from OOM
   memory_limiter:
     limit_mib: 512
 
-  # Resource processor - добавляет метаданные
+  # Resource processor - adds metadata
   resource:
     attributes:
       - key: environment
@@ -37,48 +37,48 @@ processors:
         action: upsert
 
 exporters:
-  # Jaeger exporter - отправляет трейсы в Jaeger
+  # Jaeger exporter - sends traces to Jaeger
   jaeger:
     endpoint: jaeger:14250
     tls:
       insecure: true
 
-  # Prometheus exporter - экспортирует метрики для Prometheus
+  # Prometheus exporter - exports metrics for Prometheus
   prometheus:
     endpoint: "0.0.0.0:8889"
     const_labels:
       environment: docker
 
-  # Loki exporter - отправляет логи в Loki
+  # Loki exporter - sends logs to Loki
   loki:
     endpoint: http://loki:3100/loki/api/v1/push
     tenant_id: "tenant1"
 
-  # OTLP exporter для Tempo (альтернатива Jaeger)
+  # OTLP exporter for Tempo (Jaeger alternative)
   otlp/tempo:
     endpoint: tempo:4317
     tls:
       insecure: true
 
-  # Logging exporter - для отладки (выводит в консоль)
+  # Logging exporter - for debugging (outputs to console)
   logging:
     loglevel: debug
 
 service:
   pipelines:
-    # Pipeline для трейсов
+    # Pipeline for traces
     traces:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]
       exporters: [jaeger, otlp/tempo, logging]
 
-    # Pipeline для метрик
+    # Pipeline for metrics
     metrics:
       receivers: [otlp, prometheus]
       processors: [memory_limiter, batch, resource]
       exporters: [prometheus, logging]
 
-    # Pipeline для логов
+    # Pipeline for logs
     logs:
       receivers: [otlp]
       processors: [memory_limiter, batch, resource]

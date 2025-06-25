@@ -3,13 +3,13 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-# Правила для алертов (опционально)
+# Rules for alerts (optional)
 rule_files:
   # - "first_rules.yml"
   # - "second_rules.yml"
 
 scrape_configs:
-  # Prometheus сам себя
+  # Prometheus itself
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]
@@ -21,7 +21,7 @@ scrape_configs:
     scrape_interval: 10s
     metrics_path: /metrics
 
-  # Demo приложение (если использует Prometheus exporter напрямую)
+  # Demo application (if using Prometheus exporter directly)
   - job_name: "demo-app-prometheus"
     static_configs:
       - targets: ["demo-app:8080"]
@@ -39,7 +39,7 @@ scrape_configs:
     static_configs:
       - targets: ["grafana:3000"]
     metrics_path: /metrics
-# Alertmanager configuration (опционально)
+# Alertmanager configuration (optional)
 # alerting:
 #   alertmanagers:
 #     - static_configs:

@@ -1,7 +1,7 @@
-# Упрощенная конфигурация OpenTelemetry Collector для разработки
+# Simplified OpenTelemetry Collector configuration for development
 
 receivers:
-  # OTLP receiver - ваше приложение отправляет данные сюда
+  # OTLP receiver - your application sends data here
   otlp:
     protocols:
       grpc:
@@ -10,41 +10,41 @@ receivers:
         endpoint: 0.0.0.0:4318
 
 processors:
-  # Batch processor - группирует данные
+  # Batch processor - groups data
   batch:
     timeout: 1s
     send_batch_size: 512
 
 exporters:
-  # Jaeger exporter - трейсы идут в Jaeger
+  # Jaeger exporter - traces go to Jaeger
   jaeger:
     endpoint: jaeger:14250
     tls:
       insecure: true
 
-  # Prometheus exporter - метрики для Prometheus
+  # Prometheus exporter - metrics for Prometheus
   prometheus:
     endpoint: "0.0.0.0:8889"
 
-  # Logging exporter - для отладки (видно в docker logs)
+  # Logging exporter - for debugging (visible in docker logs)
   logging:
     loglevel: info
 
 service:
   pipelines:
-    # Трейсы: приложение -> collector -> Jaeger
+    # Traces: application -> collector -> Jaeger
     traces:
       receivers: [otlp]
       processors: [batch]
       exporters: [jaeger, logging]
 
-    # Метрики: приложение -> collector -> Prometheus
+    # Metrics: application -> collector -> Prometheus
     metrics:
       receivers: [otlp]
       processors: [batch]
       exporters: [prometheus, logging]
 
-    # Логи: приложение -> collector -> консоль (пока без Loki)
+    # Logs: application -> collector -> console (no Loki yet)
     logs:
       receivers: [otlp]
       processors: [batch]
