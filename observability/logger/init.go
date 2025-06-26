@@ -21,7 +21,7 @@ func InitLogger(serviceName, serviceVersion, env string) (*log.LoggerProvider, *
 	// Create stdout exporter
 	exporter, err := stdoutlog.New()
 	if err != nil {
-		return nil, nil, fmt.Errorf("create stdout log exporter: %w", err)
+		return nil, nil, fmt.Errorf("failed tocreate stdout log exporter: %w", err)
 	}
 
 	// Create resource
@@ -55,7 +55,7 @@ func InitLoggerOTLP(ctx context.Context, serviceName, serviceVersion, env, endpo
 		otlploggrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("create otlp log exporter: %w", err)
+		return nil, nil, fmt.Errorf("failed to create otlp log exporter: %w", err)
 	}
 
 	// Create resource
@@ -79,4 +79,4 @@ func InitLoggerOTLP(ctx context.Context, serviceName, serviceVersion, env, endpo
 	otelLogger := otelslog.NewLogger(serviceName)
 
 	return lp, otelLogger, nil
-} 
+}
