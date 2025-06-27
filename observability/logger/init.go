@@ -17,11 +17,11 @@ import (
 )
 
 // InitLogger initializes OpenTelemetry LoggerProvider with stdout exporter
-func InitLogger(serviceName, serviceVersion, env string) (*log.LoggerProvider, *slog.Logger, error) {
+func InitLoggerStdout(serviceName, serviceVersion, env string, level slog.Level) (*log.LoggerProvider, *slog.Logger, error) {
 	// Create stdout exporter
 	exporter, err := stdoutlog.New()
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed tocreate stdout log exporter: %w", err)
+		return nil, nil, fmt.Errorf("failed to create stdout log exporter: %w", err)
 	}
 
 	// Create resource
@@ -41,14 +41,18 @@ func InitLogger(serviceName, serviceVersion, env string) (*log.LoggerProvider, *
 	// Set global LoggerProvider
 	global.SetLoggerProvider(lp)
 
-	// Create OTel slog logger
-	otelLogger := otelslog.NewLogger(serviceName)
+	// Create OTEL handler with level filtering
+	handler := otelslog.NewHandler(serviceName, otelslog.WithLoggerProvider(lp))
+	finalLogger := slog.New(&levelFilterHandler{
+		handler:  handler,
+		minLevel: level,
+	})
 
-	return lp, otelLogger, nil
+	return lp, finalLogger, nil
 }
 
 // InitLoggerOTLP initializes OpenTelemetry LoggerProvider with OTLP exporter
-func InitLoggerOTLP(ctx context.Context, serviceName, serviceVersion, env, endpoint string) (*log.LoggerProvider, *slog.Logger, error) {
+func InitLoggerOTLP(ctx context.Context, serviceName, serviceVersion, env, endpoint string, level slog.Level) (*log.LoggerProvider, *slog.Logger, error) {
 	// Create OTLP exporter
 	exporter, err := otlploggrpc.New(ctx,
 		otlploggrpc.WithEndpoint(endpoint),
@@ -75,8 +79,43 @@ func InitLoggerOTLP(ctx context.Context, serviceName, serviceVersion, env, endpo
 	// Set global LoggerProvider
 	global.SetLoggerProvider(lp)
 
-	// Create OTel slog logger
-	otelLogger := otelslog.NewLogger(serviceName)
+	// Create slog logger with level filtering
+	handler := otelslog.NewHandler(serviceName, otelslog.WithLoggerProvider(lp))
+	finalLogger := slog.New(&levelFilterHandler{
+		handler:  handler,
+		minLevel: level,
+	})
 
-	return lp, otelLogger, nil
+	return lp, finalLogger, nil
+}
+
+// levelFilterHandler wraps a slog.Handler to filter by log level
+type levelFilterHandler struct {
+	handler  slog.Handler
+	minLevel slog.Level
+}
+
+func (h *levelFilterHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return level >= h.minLevel && h.handler.Enabled(ctx, level)
+}
+
+func (h *levelFilterHandler) Handle(ctx context.Context, record slog.Record) error {
+	if record.Level >= h.minLevel {
+		return h.handler.Handle(ctx, record)
+	}
+	return nil
+}
+
+func (h *levelFilterHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return &levelFilterHandler{
+		handler:  h.handler.WithAttrs(attrs),
+		minLevel: h.minLevel,
+	}
+}
+
+func (h *levelFilterHandler) WithGroup(name string) slog.Handler {
+	return &levelFilterHandler{
+		handler:  h.handler.WithGroup(name),
+		minLevel: h.minLevel,
+	}
 }

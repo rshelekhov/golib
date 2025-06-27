@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"log/slog"
 
 	"github.com/rshelekhov/golib/observability/logger"
 	"github.com/rshelekhov/golib/observability/tracing"
@@ -12,14 +13,14 @@ import (
 func main() {
 	// Example 1: Stdout logger
 	stdoutExample()
-	
+
 	// Example 2: OTLP logger
 	// otlpExample()
 }
 
 func stdoutExample() {
 	// Initialize logger with stdout exporter
-	loggerProvider, otelLogger, err := logger.InitLogger("my-service", "1.0.0", "development")
+	loggerProvider, otelLogger, err := logger.InitLoggerStdout("my-service", "1.0.0", "development", slog.LevelDebug)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -56,9 +57,9 @@ func stdoutExample() {
 //nolint:unused // Example function
 func otlpExample() {
 	ctx := context.Background()
-	
+
 	// Initialize logger with OTLP exporter
-	loggerProvider, otelLogger, err := logger.InitLoggerOTLP(ctx, "my-service", "1.0.0", "production", "localhost:4317")
+	loggerProvider, otelLogger, err := logger.InitLoggerOTLP(ctx, "my-service", "1.0.0", "production", "localhost:4317", slog.LevelInfo)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -89,4 +90,4 @@ func otlpExample() {
 	otelLogger.ErrorContext(ctx, "OTLP processing failed", "error", "network timeout")
 
 	fmt.Println("Logs and traces sent to OTLP collector!")
-} 
+}

@@ -2,6 +2,7 @@ package observability
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -13,13 +14,6 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
-type Config struct {
-	Env            string
-	ServiceName    string
-	ServiceVersion string
-	EnableMetrics  bool
-}
-
 type Observability struct {
 	Logger         *slog.Logger
 	MetricsHandler http.Handler
@@ -28,20 +22,27 @@ type Observability struct {
 	TracerProvider *sdktrace.TracerProvider
 }
 
+func Setup(ctx context.Context, cfg Config) (*Observability, error) {
+	if cfg.Env == EnvLocal {
+		return Init(ctx, cfg)
+	}
+	return InitWithOTLP(ctx, cfg, cfg.OTLPEndpoint)
+}
+
 // Init initializes observability with stdout tracing and Prometheus metrics
 func Init(ctx context.Context, cfg Config) (*Observability, error) {
 	// Initialize logger with stdout (for development)
-	loggerProvider, logg, err := logger.InitLogger(cfg.ServiceName, cfg.ServiceVersion, cfg.Env)
+	loggerProvider, log, err := logger.InitLoggerStdout(cfg.ServiceName, cfg.ServiceVersion, cfg.Env, cfg.LogLevel)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Initialize tracing with stdout (for development)
 	tracerProvider, err := tracing.InitTracer(cfg.ServiceName, cfg.ServiceVersion, cfg.Env)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var metricsHandler http.Handler
 	var meterProvider *sdkmetric.MeterProvider
 	if cfg.EnableMetrics {
@@ -55,9 +56,9 @@ func Init(ctx context.Context, cfg Config) (*Observability, error) {
 			return nil, err
 		}
 	}
-	
+
 	return &Observability{
-		Logger:         logg,
+		Logger:         log,
 		MetricsHandler: metricsHandler,
 		LoggerProvider: loggerProvider,
 		MeterProvider:  meterProvider,
@@ -68,17 +69,17 @@ func Init(ctx context.Context, cfg Config) (*Observability, error) {
 // InitWithOTLP initializes observability with OTLP exporters
 func InitWithOTLP(ctx context.Context, cfg Config, otlpEndpoint string) (*Observability, error) {
 	// Initialize logger with OTLP
-	loggerProvider, logg, err := logger.InitLoggerOTLP(ctx, cfg.ServiceName, cfg.ServiceVersion, cfg.Env, otlpEndpoint)
+	loggerProvider, log, err := logger.InitLoggerOTLP(ctx, cfg.ServiceName, cfg.ServiceVersion, cfg.Env, otlpEndpoint, cfg.LogLevel)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// Initialize tracing with OTLP
 	tracerProvider, err := tracing.InitTracerOTLP(ctx, cfg.ServiceName, cfg.ServiceVersion, cfg.Env, otlpEndpoint)
 	if err != nil {
 		return nil, err
 	}
-	
+
 	var meterProvider *sdkmetric.MeterProvider
 	if cfg.EnableMetrics {
 		meterProvider, err = metrics.InitMeterOTLP(
@@ -92,9 +93,9 @@ func InitWithOTLP(ctx context.Context, cfg Config, otlpEndpoint string) (*Observ
 			return nil, err
 		}
 	}
-	
+
 	return &Observability{
-		Logger:         logg,
+		Logger:         log,
 		LoggerProvider: loggerProvider,
 		MeterProvider:  meterProvider,
 		TracerProvider: tracerProvider,
@@ -104,32 +105,32 @@ func InitWithOTLP(ctx context.Context, cfg Config, otlpEndpoint string) (*Observ
 // Shutdown gracefully shuts down all observability components
 func (o *Observability) Shutdown(ctx context.Context) error {
 	var errs []error
-	
+
 	if o.TracerProvider != nil {
 		if err := o.TracerProvider.Shutdown(ctx); err != nil {
 			errs = append(errs, err)
 		}
 	}
-	
+
 	if o.MeterProvider != nil {
 		if err := o.MeterProvider.Shutdown(ctx); err != nil {
 			errs = append(errs, err)
 		}
 	}
-	
+
 	if o.LoggerProvider != nil {
 		if err := o.LoggerProvider.Shutdown(ctx); err != nil {
 			errs = append(errs, err)
 		}
 	}
-	
+
 	if len(errs) > 0 {
-		return errs[0] // Return first error for simplicity
+		return errors.Join(errs...)
 	}
 	return nil
 }
 
 // HTTPMetricsMiddleware returns http.Handler with otel metrics
-func HTTPMetricsMiddleware(next http.Handler) http.Handler { 
-	return metrics.Middleware(next) 
+func HTTPMetricsMiddleware(next http.Handler) http.Handler {
+	return metrics.Middleware(next)
 }
