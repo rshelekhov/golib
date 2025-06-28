@@ -1,0 +1,9 @@
+go 1.24.2
+
+use (
+	./config
+	./db/mongo
+	./db/postgres
+	./observability
+	./server
+) 
