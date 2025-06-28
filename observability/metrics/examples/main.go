@@ -12,19 +12,27 @@ import (
 )
 
 func ExampleInitMeter() {
-	// Standard pattern from observability courses
-	meterProvider, handler, err := metrics.InitMeter("my-service", "1.0.0", "production")
+	ctx := context.Background()
+
+	// Standard pattern using new Config API
+	cfg := metrics.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "production",
+		ExporterType:   metrics.ExporterPrometheus,
+	}
+	meterProvider, handler, err := metrics.Init(ctx, cfg)
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
-		if err := meterProvider.Shutdown(context.Background()); err != nil {
+		if err := meterProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down: %v", err)
 		}
 	}()
 
 	http.Handle("/metrics", handler)
-	
+
 	meter := metrics.OtelMeter()
 	counter, _ := meter.Int64Counter("my_otel_counter", metric.WithDescription("Example otel counter."))
 	counter.Add(context.Background(), 1)
@@ -33,19 +41,22 @@ func ExampleInitMeter() {
 }
 
 func ExampleInitMeterOTLP() {
+	ctx := context.Background()
+
 	// OTLP exporter for push model
-	meterProvider, err := metrics.InitMeterOTLP(
-		context.Background(),
-		"my-service",
-		"1.0.0", 
-		"production",
-		"localhost:4317",
-	)
+	cfg := metrics.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "production",
+		ExporterType:   metrics.ExporterOTLP,
+		OTLPEndpoint:   "localhost:4317",
+	}
+	meterProvider, _, err := metrics.Init(ctx, cfg)
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
-		if err := meterProvider.Shutdown(context.Background()); err != nil {
+		if err := meterProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down: %v", err)
 		}
 	}()
@@ -57,24 +68,8 @@ func ExampleInitMeterOTLP() {
 	fmt.Println("Metrics pushed to OTLP collector")
 }
 
-func ExampleInitMeterStdout() {
-	// Stdout exporter for development
-	meterProvider, err := metrics.InitMeterStdout("my-service", "dev", "development")
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		if err := meterProvider.Shutdown(context.Background()); err != nil {
-			log.Printf("Error shutting down: %v", err)
-		}
-	}()
-
-	meter := metrics.OtelMeter()
-	counter, _ := meter.Int64Counter("my_stdout_counter")
-	counter.Add(context.Background(), 1)
-
-	fmt.Println("Metrics printed to stdout")
-}
+// Note: Stdout exporter for metrics has been removed as it's not practical
+// Use Prometheus exporter for local development instead
 
 func ExampleGRPCServer() {
 	server := grpc.NewServer(
@@ -87,6 +82,5 @@ func ExampleGRPCServer() {
 func main() {
 	ExampleInitMeter()
 	ExampleInitMeterOTLP()
-	ExampleInitMeterStdout()
 	ExampleGRPCServer()
 }

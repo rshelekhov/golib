@@ -15,57 +15,48 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// InitTracer initializes OpenTelemetry TracerProvider with stdout exporter
-func InitTracer(serviceName, serviceVersion, env string) (*sdktrace.TracerProvider, error) {
-	// Create stdout exporter
-	exporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
-	if err != nil {
-		return nil, fmt.Errorf("create stdout exporter: %w", err)
-	}
+type ExporterType string
 
-	// Create resource
-	res := resource.NewWithAttributes(
-		resource.Default().SchemaURL(),
-		semconv.ServiceName(serviceName),
-		semconv.ServiceVersion(serviceVersion),
-		semconv.DeploymentEnvironment(env),
-	)
+const (
+	ExporterStdout ExporterType = "stdout"
+	ExporterOTLP   ExporterType = "otlp"
+)
 
-	// Create TracerProvider
-	tp := sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(res),
-	)
-
-	// Set global TracerProvider
-	otel.SetTracerProvider(tp)
-
-	// Set global TextMapPropagator
-	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	))
-
-	return tp, nil
+type Config struct {
+	ServiceName    string
+	ServiceVersion string
+	Env            string
+	ExporterType   ExporterType
+	OTLPEndpoint   string // Used only when ExporterType is ExporterOTLP
 }
 
-// InitTracerOTLP initializes OpenTelemetry TracerProvider with OTLP exporter
-func InitTracerOTLP(ctx context.Context, serviceName, serviceVersion, env, endpoint string) (*sdktrace.TracerProvider, error) {
-	// Create OTLP exporter
-	exporter, err := otlptracegrpc.New(ctx,
-		otlptracegrpc.WithEndpoint(endpoint),
-		otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create otlp exporter: %w", err)
+// Init initializes OpenTelemetry TracerProvider
+func Init(ctx context.Context, cfg Config) (*sdktrace.TracerProvider, error) {
+	var exporter sdktrace.SpanExporter
+	var err error
+
+	switch cfg.ExporterType {
+	case ExporterOTLP:
+		exporter, err = otlptracegrpc.New(ctx,
+			otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
+			otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("create otlp exporter: %w", err)
+		}
+	default: // ExporterStdout or empty
+		exporter, err = stdouttrace.New(stdouttrace.WithPrettyPrint())
+		if err != nil {
+			return nil, fmt.Errorf("create stdout exporter: %w", err)
+		}
 	}
 
 	// Create resource
 	res := resource.NewWithAttributes(
 		resource.Default().SchemaURL(),
-		semconv.ServiceName(serviceName),
-		semconv.ServiceVersion(serviceVersion),
-		semconv.DeploymentEnvironment(env),
+		semconv.ServiceName(cfg.ServiceName),
+		semconv.ServiceVersion(cfg.ServiceVersion),
+		semconv.DeploymentEnvironment(cfg.Env),
 	)
 
 	// Create TracerProvider

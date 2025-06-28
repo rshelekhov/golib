@@ -5,28 +5,65 @@ import (
 	"net/http"
 	"time"
 
+	promclient "github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/prometheus"
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
-	promclient "github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-// InitMeter initializes OpenTelemetry MeterProvider with Prometheus exporter
-func InitMeter(serviceName, serviceVersion, env string) (*sdkmetric.MeterProvider, http.Handler, error) {
+type ExporterType string
+
+const (
+	ExporterPrometheus ExporterType = "prometheus"
+	ExporterOTLP       ExporterType = "otlp"
+)
+
+type Config struct {
+	ServiceName    string
+	ServiceVersion string
+	Env            string
+	ExporterType   ExporterType
+	OTLPEndpoint   string        // Used only when ExporterType is ExporterOTLP
+	PushInterval   time.Duration // Used for OTLP exporter, defaults to 30s
+}
+
+// Init initializes OpenTelemetry MeterProvider with the specified exporter
+func Init(ctx context.Context, cfg Config) (*sdkmetric.MeterProvider, http.Handler, error) {
 	// Create resource
 	res := resource.NewWithAttributes(
 		resource.Default().SchemaURL(),
-		semconv.ServiceName(serviceName),
-		semconv.ServiceVersion(serviceVersion),
-		semconv.DeploymentEnvironment(env),
+		semconv.ServiceName(cfg.ServiceName),
+		semconv.ServiceVersion(cfg.ServiceVersion),
+		semconv.DeploymentEnvironment(cfg.Env),
 	)
 
+	var provider *sdkmetric.MeterProvider
+	var handler http.Handler
+	var err error
+
+	switch cfg.ExporterType {
+	case ExporterOTLP:
+		provider, err = initOTLP(ctx, res, cfg.OTLPEndpoint, cfg.PushInterval)
+	default: // ExporterPrometheus or empty
+		provider, handler, err = initPrometheus(res)
+	}
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	// Set global MeterProvider
+	otel.SetMeterProvider(provider)
+
+	return provider, handler, nil
+}
+
+func initPrometheus(res *resource.Resource) (*sdkmetric.MeterProvider, http.Handler, error) {
 	// Create Prometheus exporter
 	registry := promclient.NewRegistry()
 	exporter, err := prometheus.New(
@@ -42,25 +79,13 @@ func InitMeter(serviceName, serviceVersion, env string) (*sdkmetric.MeterProvide
 		sdkmetric.WithReader(exporter),
 	)
 
-	// Set global MeterProvider
-	otel.SetMeterProvider(provider)
-
 	// Create HTTP handler for metrics
 	handler := promhttp.HandlerFor(registry, promhttp.HandlerOpts{})
 
 	return provider, handler, nil
 }
 
-// InitMeterOTLP initializes OpenTelemetry MeterProvider with OTLP exporter
-func InitMeterOTLP(ctx context.Context, serviceName, serviceVersion, env, endpoint string) (*sdkmetric.MeterProvider, error) {
-	// Create resource
-	res := resource.NewWithAttributes(
-		resource.Default().SchemaURL(),
-		semconv.ServiceName(serviceName),
-		semconv.ServiceVersion(serviceVersion),
-		semconv.DeploymentEnvironment(env),
-	)
-
+func initOTLP(ctx context.Context, res *resource.Resource, endpoint string, interval time.Duration) (*sdkmetric.MeterProvider, error) {
 	// Create OTLP exporter
 	exporter, err := otlpmetricgrpc.New(ctx,
 		otlpmetricgrpc.WithEndpoint(endpoint),
@@ -70,44 +95,14 @@ func InitMeterOTLP(ctx context.Context, serviceName, serviceVersion, env, endpoi
 		return nil, err
 	}
 
-	// Create periodic reader
-	reader := sdkmetric.NewPeriodicReader(
-		exporter,
-		sdkmetric.WithInterval(30*time.Second),
-	)
-
-	// Create MeterProvider
-	provider := sdkmetric.NewMeterProvider(
-		sdkmetric.WithResource(res),
-		sdkmetric.WithReader(reader),
-	)
-
-	// Set global MeterProvider
-	otel.SetMeterProvider(provider)
-
-	return provider, nil
-}
-
-// InitMeterStdout initializes OpenTelemetry MeterProvider with stdout exporter (for development)
-func InitMeterStdout(serviceName, serviceVersion, env string) (*sdkmetric.MeterProvider, error) {
-	// Create resource
-	res := resource.NewWithAttributes(
-		resource.Default().SchemaURL(),
-		semconv.ServiceName(serviceName),
-		semconv.ServiceVersion(serviceVersion),
-		semconv.DeploymentEnvironment(env),
-	)
-
-	// Create stdout exporter
-	exporter, err := stdoutmetric.New()
-	if err != nil {
-		return nil, err
+	if interval == 0 {
+		interval = 30 * time.Second
 	}
 
 	// Create periodic reader
 	reader := sdkmetric.NewPeriodicReader(
 		exporter,
-		sdkmetric.WithInterval(10*time.Second),
+		sdkmetric.WithInterval(interval),
 	)
 
 	// Create MeterProvider
@@ -115,9 +110,6 @@ func InitMeterStdout(serviceName, serviceVersion, env string) (*sdkmetric.MeterP
 		sdkmetric.WithResource(res),
 		sdkmetric.WithReader(reader),
 	)
-
-	// Set global MeterProvider
-	otel.SetMeterProvider(provider)
 
 	return provider, nil
 }

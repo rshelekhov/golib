@@ -19,24 +19,38 @@ func main() {
 }
 
 func stdoutExample() {
+	ctx := context.Background()
+
 	// Initialize logger with stdout exporter
-	loggerProvider, otelLogger, err := logger.InitLoggerStdout("my-service", "1.0.0", "development", slog.LevelDebug)
+	loggerCfg := logger.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		Level:          slog.LevelDebug,
+	}
+	loggerProvider, otelLogger, err := logger.Init(ctx, loggerCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer func() {
-		if err := loggerProvider.Shutdown(context.Background()); err != nil {
+		if err := loggerProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down logger: %v", err)
 		}
 	}()
 
 	// Initialize tracing to see correlation
-	tracerProvider, err := tracing.InitTracer("my-service", "1.0.0", "development")
+	tracingCfg := tracing.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		ExporterType:   tracing.ExporterStdout,
+	}
+	tracerProvider, err := tracing.Init(ctx, tracingCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer func() {
-		if err := tracerProvider.Shutdown(context.Background()); err != nil {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down tracer: %v", err)
 		}
 	}()
@@ -59,23 +73,37 @@ func otlpExample() {
 	ctx := context.Background()
 
 	// Initialize logger with OTLP exporter
-	loggerProvider, otelLogger, err := logger.InitLoggerOTLP(ctx, "my-service", "1.0.0", "production", "localhost:4317", slog.LevelInfo)
+	loggerCfg := logger.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "production",
+		Level:          slog.LevelInfo,
+		Endpoint:       "localhost:4317",
+	}
+	loggerProvider, otelLogger, err := logger.Init(ctx, loggerCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer func() {
-		if err := loggerProvider.Shutdown(context.Background()); err != nil {
+		if err := loggerProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down logger: %v", err)
 		}
 	}()
 
 	// Initialize tracing with OTLP
-	tracerProvider, err := tracing.InitTracerOTLP(ctx, "my-service", "1.0.0", "production", "localhost:4317")
+	tracingCfg := tracing.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "production",
+		ExporterType:   tracing.ExporterOTLP,
+		OTLPEndpoint:   "localhost:4317",
+	}
+	tracerProvider, err := tracing.Init(ctx, tracingCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer func() {
-		if err := tracerProvider.Shutdown(context.Background()); err != nil {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down tracer: %v", err)
 		}
 	}()

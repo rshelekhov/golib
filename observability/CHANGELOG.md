@@ -5,6 +5,28 @@ All notable changes to the Observability package will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2025-06-28
+
+### Added
+
+- **Unified API**: New `Init(ctx context.Context, cfg Config)` function for all packages
+- **Config structs**: Added `Config` type to all packages (logger, metrics, tracing)
+- **Automatic exporter selection**: Based on configuration, no manual exporter choice needed
+- **Metrics optimization**: Disabled by default in local development environment
+
+### Changed
+
+- Simplified initialization with unified `Init(ctx, Config)` API
+- Improved metrics handling in local development (zero overhead)
+- Enhanced configuration with automatic exporter selection
+- Removed stdout exporter for metrics (impractical)
+
+### Documentation
+
+- Updated all README files with new unified API
+- Updated all examples to use new `Init(ctx, Config)` pattern
+- Simplified local development setup (no metrics overhead)
+
 ## [1.2.0] - 2025-06-27
 
 ### Added

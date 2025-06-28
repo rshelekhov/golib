@@ -6,7 +6,7 @@ Library for logging, tracing and metrics in Go microservices and projects.
 
 - **Logging** (slog, trace_id/span_id automatically, configurable log levels)
 - **Tracing** (OpenTelemetry, stdout/OTLP exporters, propagation setup)
-- **Metrics** (OpenTelemetry + Prometheus/OTLP/stdout exporters)
+- **Metrics** (OpenTelemetry + Prometheus/OTLP exporters)
 
 ## Quick start
 
@@ -19,17 +19,16 @@ import (
 	"net/http"
 
 	"github.com/rshelekhov/golib/observability"
-	"github.com/rshelekhov/golib/observability/metrics"
 )
 
 func main() {
-	// Simple initialization with default debug logging for local development
-	cfg, err := observability.NewConfig(observability.EnvLocal, "my-service", "1.0.0", true, "")
+	// Simple initialization for local development (metrics always disabled)
+	cfg, err := observability.NewConfig(observability.EnvLocal, "my-service", "1.0.0", false, "")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	obs, err := observability.Setup(context.Background(), cfg)
+	obs, err := observability.Init(context.Background(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,18 +38,18 @@ func main() {
 		}
 	}()
 
-	// HTTP server with metrics endpoint
-	http.Handle("/metrics", obs.MetricsHandler) // Prometheus scrapes this
-	http.Handle("/", metrics.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Simple HTTP server (no metrics - they're disabled for local)
+	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Debug logs will be shown in local development
 		obs.Logger.DebugContext(r.Context(), "processing request", "path", r.URL.Path)
 		obs.Logger.InfoContext(r.Context(), "hello world")
 		if _, err := w.Write([]byte("ok")); err != nil {
 			log.Printf("Error writing response: %v", err)
 		}
-	})))
+	}))
 
 	log.Printf("HTTP server listening on :8080")
+	log.Printf("Metrics are disabled for local development")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 ```
@@ -65,7 +64,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	obs, err := observability.Setup(context.Background(), cfg)
+	obs, err := observability.Init(context.Background(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -86,7 +85,7 @@ cfg, err := observability.NewConfig(
 	slog.LevelWarn, // Override default debug level to warn
 )
 
-obs, err := observability.Setup(context.Background(), cfg)
+obs, err := observability.Init(context.Background(), cfg)
 ```
 
 ### Error Handling for Invalid Configurations
@@ -128,7 +127,7 @@ cfg, err := observability.NewConfig(observability.EnvDev, "my-service", "1.0.0",
 if err != nil {
 	log.Fatal(err)
 }
-obs, err := observability.Setup(context.Background(), cfg)
+obs, err := observability.Init(context.Background(), cfg)
 ```
 
 See [infrastructure/README.md](infrastructure/README.md) for setup guide, troubleshooting, and production considerations.
@@ -141,8 +140,8 @@ See [infrastructure/README.md](infrastructure/README.md) for setup guide, troubl
 // NewConfig(env, serviceName, serviceVersion, enableMetrics, otlpEndpoint, logLevel...)
 // Optional logLevel parameter overrides environment defaults
 
-// Local development with default debug logging
-cfg, err := observability.NewConfig(observability.EnvLocal, "service-name", "1.0.0", true, "")
+// Local development with default debug logging (metrics always disabled)
+cfg, err := observability.NewConfig(observability.EnvLocal, "service-name", "1.0.0", false, "")
 
 // Production with default info logging
 cfg, err := observability.NewConfig(observability.EnvProd, "service-name", "1.0.0", true, "localhost:4317")
@@ -183,133 +182,71 @@ if err := cfg.Validate(); err != nil {
 - `slog.LevelWarn` - Warnings and errors only
 - `slog.LevelError` - Errors only
 
-## Initialization Options
+## Automatic Exporter Selection
 
-### Simple (Automatic based on Env)
+The `Init()` function automatically chooses the appropriate exporters based on your configuration:
 
-```go
-cfg := observability.NewLocalConfig("my-service", "1.0.0", true)
-obs, err := observability.Setup(context.Background(), cfg)
-```
+### Local Development (`EnvLocal`)
 
-### Advanced (Custom)
+- **Logging**: stdout with pretty formatting
+- **Tracing**: stdout with pretty formatting
+- **Metrics**: completely disabled (no overhead)
 
-```go
-// Custom OTLP endpoint
-obs, err := observability.InitWithOTLP(ctx, cfg, "custom-endpoint:4317")
-```
+### Production (`EnvProd`, `EnvDev` with OTLP endpoint)
 
-## Direct Initialization (Advanced)
+- **Logging**: OTLP exporter
+- **Tracing**: OTLP exporter
+- **Metrics**: OTLP exporter (push model)
 
-### Tracing
+### Configuration Examples
 
 ```go
-// Initialize tracer directly (like in observability courses)
-tracerProvider, err := tracing.InitTracer("my-service", "1.0.0", "development")
-defer tracerProvider.Shutdown(ctx)
+// Local development - uses stdout, metrics always disabled
+cfg := observability.Config{
+	Env:            observability.EnvLocal,
+	ServiceName:    "my-service",
+	ServiceVersion: "1.0.0",
+	EnableMetrics:  false, // Ignored for local - always disabled
+	// OTLPEndpoint not needed for local
+}
 
-// Or OTLP tracer
-tracerProvider, err := tracing.InitTracerOTLP(ctx, "my-service", "1.0.0", "production", "localhost:4317")
-defer tracerProvider.Shutdown(ctx)
+// Production - uses OTLP for everything
+cfg := observability.Config{
+	Env:            observability.EnvProd,
+	ServiceName:    "my-service",
+	ServiceVersion: "1.0.0",
+	EnableMetrics:  true,
+	OTLPEndpoint:   "localhost:4317", // Required for prod
+}
+
+obs, err := observability.Init(context.Background(), cfg)
 ```
 
-### Logging
+## Architecture
 
-```go
-// Direct logger initialization with custom level
-loggerProvider, logger, err := logger.InitLoggerStdout("my-service", "1.0.0", "development", slog.LevelWarn)
-defer loggerProvider.Shutdown(ctx)
+All sub-packages follow the same pattern:
 
-// Or OTLP logger
-loggerProvider, logger, err := logger.InitLoggerOTLP(ctx, "my-service", "1.0.0", "production", "localhost:4317", slog.LevelInfo)
-defer loggerProvider.Shutdown(ctx)
-```
+- **`logger.Init(ctx, logger.Config)`** - unified logger initialization
+- **`metrics.Init(ctx, metrics.Config)`** - unified metrics initialization
+- **`tracing.Init(ctx, tracing.Config)`** - unified tracing initialization
+- **`observability.Init(ctx, observability.Config)`** - orchestrates all components
 
-### Metrics
-
-```go
-// Initialize meter directly
-meterProvider, handler, err := metrics.InitMeter("my-service", "1.0.0", "production")
-defer meterProvider.Shutdown(ctx)
-http.Handle("/metrics", handler)
-```
-
-## Features
-
-### Automatic Propagation Setup
-
-Both `InitTracer` and `InitTracerOTLP` automatically configure:
-
-```go
-otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-	propagation.TraceContext{},
-	propagation.Baggage{},
-))
-```
-
-### Resource Attributes
-
-All initialization functions set:
-
-```go
-semconv.ServiceName(serviceName)
-semconv.ServiceVersion(serviceVersion)
-semconv.DeploymentEnvironment(env)
-```
-
-## gRPC integration
-
-```go
-// Use stats.Handler for tracing
-server := grpc.NewServer(
-	grpc.StatsHandler(tracing.GRPCServerStatsHandler()),
-	grpc.UnaryInterceptor(metrics.UnaryServerInterceptor()),
-	grpc.StreamInterceptor(metrics.StreamServerInterceptor()),
-)
-
-// For client
-conn, err := grpc.NewClient("localhost:50051",
-	grpc.WithStatsHandler(tracing.GRPCClientStatsHandler()),
-)
-```
-
-## Creating spans manually
-
-```go
-// HTTP span
-ctx, span := tracing.SpanFromHTTP(ctx, "GET", "/api/v1/users/{id}")
-defer span.End()
-
-// gRPC span
-ctx, span := tracing.SpanFromGRPC(ctx, "UserService.GetUser")
-defer span.End()
-
-// Outgoing call (DB, external API)
-ctx, span := tracing.OutgoingSpan(ctx, "db.query", tracing.SpanKindClient,
-	tracing.String("db.system", "postgresql"),
-	tracing.String("db.statement", "SELECT * FROM users WHERE id = ?"),
-)
-defer span.End()
-```
-
-## Business metrics
-
-```go
-// Write business error
-metrics.IncBusinessError("validation", "invalid_email")
-```
+Each package automatically selects the appropriate exporter based on configuration.
 
 ## Examples
 
-- [logger/README.md](logger/README.md)
-- [tracing/README.md](tracing/README.md)
-- [metrics/README.md](metrics/README.md)
-- [examples/main.go](examples/main.go) - full example with different log levels
+See [examples/main.go](examples/main.go) for complete working examples of:
+
+- Local development setup
+- Production setup
+- Custom log levels
+- Error handling
+- Manual component initialization
 
 ## Best practices
 
 - **Use helper functions** - `NewLocalConfig()`, `NewProdConfig()` for typical setups
-- **Use `observability.Setup()`** - automatically chooses stdout or OTLP based on env
+- **Use `observability.Init()`** - automatically chooses stdout or OTLP based on env
 - **Adjust log levels** - Debug for local, Info for production, Warn for high-traffic services
 - **Always call `defer obs.Shutdown(ctx)`** for proper cleanup
 - **Propagation is set up automatically** - no manual configuration needed

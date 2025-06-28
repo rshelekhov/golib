@@ -16,58 +16,42 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// InitLogger initializes OpenTelemetry LoggerProvider with stdout exporter
-func InitLoggerStdout(serviceName, serviceVersion, env string, level slog.Level) (*log.LoggerProvider, *slog.Logger, error) {
-	// Create stdout exporter
-	exporter, err := stdoutlog.New()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create stdout log exporter: %w", err)
-	}
-
-	// Create resource
-	res := resource.NewWithAttributes(
-		resource.Default().SchemaURL(),
-		semconv.ServiceName(serviceName),
-		semconv.ServiceVersion(serviceVersion),
-		semconv.DeploymentEnvironment(env),
-	)
-
-	// Create LoggerProvider
-	lp := log.NewLoggerProvider(
-		log.WithProcessor(log.NewBatchProcessor(exporter)),
-		log.WithResource(res),
-	)
-
-	// Set global LoggerProvider
-	global.SetLoggerProvider(lp)
-
-	// Create OTEL handler with level filtering
-	handler := otelslog.NewHandler(serviceName, otelslog.WithLoggerProvider(lp))
-	finalLogger := slog.New(&levelFilterHandler{
-		handler:  handler,
-		minLevel: level,
-	})
-
-	return lp, finalLogger, nil
+type Config struct {
+	ServiceName    string
+	ServiceVersion string
+	Env            string
+	Level          slog.Level
+	Endpoint       string // OTLP endpoint. If empty, stdout exporter is used.
 }
 
-// InitLoggerOTLP initializes OpenTelemetry LoggerProvider with OTLP exporter
-func InitLoggerOTLP(ctx context.Context, serviceName, serviceVersion, env, endpoint string, level slog.Level) (*log.LoggerProvider, *slog.Logger, error) {
-	// Create OTLP exporter
-	exporter, err := otlploggrpc.New(ctx,
-		otlploggrpc.WithEndpoint(endpoint),
-		otlploggrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-	)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to create otlp log exporter: %w", err)
+// Init initializes OpenTelemetry LoggerProvider
+func Init(ctx context.Context, cfg Config) (*log.LoggerProvider, *slog.Logger, error) {
+	var exporter log.Exporter
+	var err error
+
+	if cfg.Endpoint == "" {
+		// Create stdout exporter
+		exporter, err = stdoutlog.New()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create stdout log exporter: %w", err)
+		}
+	} else {
+		// Create OTLP exporter
+		exporter, err = otlploggrpc.New(ctx,
+			otlploggrpc.WithEndpoint(cfg.Endpoint),
+			otlploggrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+		)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create otlp log exporter: %w", err)
+		}
 	}
 
 	// Create resource
 	res := resource.NewWithAttributes(
 		resource.Default().SchemaURL(),
-		semconv.ServiceName(serviceName),
-		semconv.ServiceVersion(serviceVersion),
-		semconv.DeploymentEnvironment(env),
+		semconv.ServiceName(cfg.ServiceName),
+		semconv.ServiceVersion(cfg.ServiceVersion),
+		semconv.DeploymentEnvironment(cfg.Env),
 	)
 
 	// Create LoggerProvider
@@ -80,10 +64,10 @@ func InitLoggerOTLP(ctx context.Context, serviceName, serviceVersion, env, endpo
 	global.SetLoggerProvider(lp)
 
 	// Create slog logger with level filtering
-	handler := otelslog.NewHandler(serviceName, otelslog.WithLoggerProvider(lp))
+	handler := otelslog.NewHandler(cfg.ServiceName, otelslog.WithLoggerProvider(lp))
 	finalLogger := slog.New(&levelFilterHandler{
 		handler:  handler,
-		minLevel: level,
+		minLevel: cfg.Level,
 	})
 
 	return lp, finalLogger, nil

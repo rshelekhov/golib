@@ -13,27 +13,16 @@ import (
 
 // Example of tracing initialization (stdout)
 func ExampleInitTracer() {
-	// Standard pattern from observability courses
-	tracerProvider, err := tracing.InitTracer("my-service", "1.0.0", "development")
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		if err := tracerProvider.Shutdown(context.Background()); err != nil {
-			log.Printf("Error shutting down tracer: %v", err)
-		}
-	}()
-	
-	fmt.Println("Tracer initialized with stdout exporter")
-	// ... your application logic
-}
-
-// Example of tracing initialization (OTLP)
-func ExampleInitTracerOTLP() {
 	ctx := context.Background()
-	
-	// OTLP exporter for production
-	tracerProvider, err := tracing.InitTracerOTLP(ctx, "my-service", "1.0.0", "production", "localhost:4317")
+
+	// Standard pattern using new Config API
+	cfg := tracing.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		ExporterType:   tracing.ExporterStdout,
+	}
+	tracerProvider, err := tracing.Init(ctx, cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -42,20 +31,54 @@ func ExampleInitTracerOTLP() {
 			log.Printf("Error shutting down tracer: %v", err)
 		}
 	}()
-	
+
+	fmt.Println("Tracer initialized with stdout exporter")
+	// ... your application logic
+}
+
+// Example of tracing initialization (OTLP)
+func ExampleInitTracerOTLP() {
+	ctx := context.Background()
+
+	// OTLP exporter for production
+	cfg := tracing.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "production",
+		ExporterType:   tracing.ExporterOTLP,
+		OTLPEndpoint:   "localhost:4317",
+	}
+	tracerProvider, err := tracing.Init(ctx, cfg)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down tracer: %v", err)
+		}
+	}()
+
 	fmt.Println("Tracer initialized with OTLP exporter")
 	// ... your application logic
 }
 
 // Example of HTTP middleware
 func ExampleHTTPMiddleware() {
+	ctx := context.Background()
+
 	// Initialize tracer first
-	tracerProvider, err := tracing.InitTracer("my-service", "1.0.0", "development")
+	cfg := tracing.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		ExporterType:   tracing.ExporterStdout,
+	}
+	tracerProvider, err := tracing.Init(ctx, cfg)
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
-		if err := tracerProvider.Shutdown(context.Background()); err != nil {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down tracer: %v", err)
 		}
 	}()
@@ -66,20 +89,28 @@ func ExampleHTTPMiddleware() {
 			log.Printf("Error writing response: %v", err)
 		}
 	})
-	
+
 	handler := tracing.HTTPMiddleware(mux, "my-service")
 	log.Fatal(http.ListenAndServe(":8080", handler))
 }
 
 // Example of gRPC server with tracing
 func ExampleGRPCStatsHandler() {
+	ctx := context.Background()
+
 	// Initialize tracer first
-	tracerProvider, err := tracing.InitTracer("my-service", "1.0.0", "development")
+	cfg := tracing.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		ExporterType:   tracing.ExporterStdout,
+	}
+	tracerProvider, err := tracing.Init(ctx, cfg)
 	if err != nil {
 		panic(err)
 	}
 	defer func() {
-		if err := tracerProvider.Shutdown(context.Background()); err != nil {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down tracer: %v", err)
 		}
 	}()
@@ -87,15 +118,15 @@ func ExampleGRPCStatsHandler() {
 	server := grpc.NewServer(
 		grpc.StatsHandler(tracing.GRPCServerStatsHandler()),
 	)
-	
+
 	// Register your gRPC services here
 	// pb.RegisterYourServiceServer(server, &yourServiceImpl{})
-	
+
 	lis, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
-	
+
 	log.Printf("gRPC server listening on :50051")
 	log.Fatal(server.Serve(lis))
 }
@@ -105,7 +136,7 @@ func ExampleSpanFromHTTP() {
 	ctx := context.Background()
 	_, span := tracing.SpanFromHTTP(ctx, "GET", "/api/v1/users/{id}")
 	defer span.End()
-	
+
 	// Your business logic here
 	fmt.Printf("Trace ID: %s\n", span.SpanContext().TraceID())
 }
@@ -115,7 +146,7 @@ func ExampleSpanFromGRPC() {
 	ctx := context.Background()
 	_, span := tracing.SpanFromGRPC(ctx, "UserService.GetUser")
 	defer span.End()
-	
+
 	// Your business logic here
 	fmt.Printf("Trace ID: %s\n", span.SpanContext().TraceID())
 }
@@ -128,7 +159,7 @@ func ExampleOutgoingSpan() {
 		tracing.String("db.statement", "SELECT * FROM users WHERE id = ?"),
 	)
 	defer span.End()
-	
+
 	// Execute DB query
 	fmt.Printf("Span ID: %s\n", span.SpanContext().SpanID())
 }
@@ -136,12 +167,12 @@ func ExampleOutgoingSpan() {
 func main() {
 	// Run one of the examples
 	// Uncomment the needed example:
-	
+
 	// ExampleInitTracer()
 	// ExampleInitTracerOTLP()
 	// ExampleHTTPMiddleware()
 	// ExampleGRPCStatsHandler()
-	
+
 	// Or run simple examples:
 	ExampleSpanFromHTTP()
 	ExampleSpanFromGRPC()

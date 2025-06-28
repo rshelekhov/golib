@@ -22,36 +22,61 @@ type Observability struct {
 	TracerProvider *sdktrace.TracerProvider
 }
 
-func Setup(ctx context.Context, cfg Config) (*Observability, error) {
-	if cfg.Env == EnvLocal {
-		return Init(ctx, cfg)
-	}
-	return InitWithOTLP(ctx, cfg, cfg.OTLPEndpoint)
-}
-
-// Init initializes observability with stdout tracing and Prometheus metrics
+// Init initializes observability with automatic exporter selection
 func Init(ctx context.Context, cfg Config) (*Observability, error) {
-	// Initialize logger with stdout (for development)
-	loggerProvider, log, err := logger.InitLoggerStdout(cfg.ServiceName, cfg.ServiceVersion, cfg.Env, cfg.LogLevel)
+	// Determine if we should use OTLP based on configuration
+	useOTLP := cfg.OTLPEndpoint != "" && cfg.Env != EnvLocal
+
+	// Initialize logger
+	loggerCfg := logger.Config{
+		ServiceName:    cfg.ServiceName,
+		ServiceVersion: cfg.ServiceVersion,
+		Env:            cfg.Env,
+		Level:          cfg.LogLevel,
+	}
+	if useOTLP {
+		loggerCfg.Endpoint = cfg.OTLPEndpoint
+	}
+	loggerProvider, log, err := logger.Init(ctx, loggerCfg)
 	if err != nil {
 		return nil, err
 	}
 
-	// Initialize tracing with stdout (for development)
-	tracerProvider, err := tracing.InitTracer(cfg.ServiceName, cfg.ServiceVersion, cfg.Env)
+	// Initialize tracing
+	tracingCfg := tracing.Config{
+		ServiceName:    cfg.ServiceName,
+		ServiceVersion: cfg.ServiceVersion,
+		Env:            cfg.Env,
+	}
+	if useOTLP {
+		tracingCfg.ExporterType = tracing.ExporterOTLP
+		tracingCfg.OTLPEndpoint = cfg.OTLPEndpoint
+	} else {
+		tracingCfg.ExporterType = tracing.ExporterStdout
+	}
+	tracerProvider, err := tracing.Init(ctx, tracingCfg)
 	if err != nil {
 		return nil, err
 	}
 
 	var metricsHandler http.Handler
 	var meterProvider *sdkmetric.MeterProvider
-	if cfg.EnableMetrics {
-		// Default to Prometheus exporter
-		meterProvider, metricsHandler, err = metrics.InitMeter(
-			cfg.ServiceName,
-			cfg.ServiceVersion,
-			cfg.Env,
-		)
+
+	// Metrics are completely disabled for local development
+	// For other environments, respect the EnableMetrics flag
+	if cfg.Env != EnvLocal && cfg.EnableMetrics {
+		metricsCfg := metrics.Config{
+			ServiceName:    cfg.ServiceName,
+			ServiceVersion: cfg.ServiceVersion,
+			Env:            cfg.Env,
+		}
+		if useOTLP {
+			metricsCfg.ExporterType = metrics.ExporterOTLP
+			metricsCfg.OTLPEndpoint = cfg.OTLPEndpoint
+		} else {
+			metricsCfg.ExporterType = metrics.ExporterPrometheus
+		}
+		meterProvider, metricsHandler, err = metrics.Init(ctx, metricsCfg)
 		if err != nil {
 			return nil, err
 		}
@@ -60,42 +85,6 @@ func Init(ctx context.Context, cfg Config) (*Observability, error) {
 	return &Observability{
 		Logger:         log,
 		MetricsHandler: metricsHandler,
-		LoggerProvider: loggerProvider,
-		MeterProvider:  meterProvider,
-		TracerProvider: tracerProvider,
-	}, nil
-}
-
-// InitWithOTLP initializes observability with OTLP exporters
-func InitWithOTLP(ctx context.Context, cfg Config, otlpEndpoint string) (*Observability, error) {
-	// Initialize logger with OTLP
-	loggerProvider, log, err := logger.InitLoggerOTLP(ctx, cfg.ServiceName, cfg.ServiceVersion, cfg.Env, otlpEndpoint, cfg.LogLevel)
-	if err != nil {
-		return nil, err
-	}
-
-	// Initialize tracing with OTLP
-	tracerProvider, err := tracing.InitTracerOTLP(ctx, cfg.ServiceName, cfg.ServiceVersion, cfg.Env, otlpEndpoint)
-	if err != nil {
-		return nil, err
-	}
-
-	var meterProvider *sdkmetric.MeterProvider
-	if cfg.EnableMetrics {
-		meterProvider, err = metrics.InitMeterOTLP(
-			ctx,
-			cfg.ServiceName,
-			cfg.ServiceVersion,
-			cfg.Env,
-			otlpEndpoint,
-		)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &Observability{
-		Logger:         log,
 		LoggerProvider: loggerProvider,
 		MeterProvider:  meterProvider,
 		TracerProvider: tracerProvider,

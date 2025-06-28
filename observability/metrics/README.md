@@ -1,6 +1,6 @@
 # observability/metrics
 
-OpenTelemetry metrics for Go services: simple initialization following observability course patterns.
+OpenTelemetry metrics for Go services: simple initialization with automatic exporter selection.
 
 ## Quick start
 
@@ -13,8 +13,14 @@ import (
 )
 
 func main() {
-	// Initialize meter (like in observability courses)
-	meterProvider, handler, err := metrics.InitMeter("my-service", "1.0.0", "production")
+	// Initialize meter with automatic exporter selection
+	cfg := metrics.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "production",
+		ExporterType:   metrics.ExporterPrometheus, // or metrics.ExporterOTLP
+	}
+	meterProvider, handler, err := metrics.Init(context.Background(), cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -24,8 +30,10 @@ func main() {
 		}
 	}()
 
-	// Metrics endpoint
-	http.Handle("/metrics", handler)
+	// Metrics endpoint (only for Prometheus exporter)
+	if handler != nil {
+		http.Handle("/metrics", handler)
+	}
 
 	// Create custom metric
 	meter := metrics.OtelMeter()
@@ -49,13 +57,56 @@ func main() {
 }
 ```
 
-## Initialization Functions
+## Configuration
+
+```go
+type Config struct {
+	ServiceName    string
+	ServiceVersion string
+	Env            string
+	ExporterType   ExporterType
+	OTLPEndpoint   string        // Used only when ExporterType is ExporterOTLP
+	PushInterval   time.Duration // Used for OTLP exporter, defaults to 30s
+}
+
+type ExporterType string
+
+const (
+	ExporterPrometheus ExporterType = "prometheus"
+	ExporterOTLP       ExporterType = "otlp"
+)
+```
+
+## Initialization
+
+### `Init(ctx context.Context, cfg Config) (*sdkmetric.MeterProvider, http.Handler, error)`
+
+Unified initialization function that automatically selects the appropriate exporter.
+
+**Exporter Selection:**
+
+- `ExporterPrometheus`: Pull model with HTTP endpoint for scraping
+- `ExporterOTLP`: Push model, metrics sent to OTLP collector
+
+**Returns:**
+
+- `*sdkmetric.MeterProvider` - For shutdown management
+- `http.Handler` - Metrics endpoint (only for Prometheus, nil for OTLP)
+- `error` - Initialization error
+
+## Exporter Types
 
 ### Prometheus (Pull Model)
 
 ```go
-// Standard pattern from observability courses
-meterProvider, handler, err := metrics.InitMeter("my-service", "1.0.0", "production")
+// Standard pattern for Prometheus scraping
+cfg := metrics.Config{
+	ServiceName:    "my-service",
+	ServiceVersion: "1.0.0",
+	Env:            "production",
+	ExporterType:   metrics.ExporterPrometheus,
+}
+meterProvider, handler, err := metrics.Init(ctx, cfg)
 defer meterProvider.Shutdown(ctx)
 
 // Expose metrics via HTTP endpoint
@@ -66,20 +117,18 @@ http.Handle("/metrics", handler)
 
 ```go
 // For Grafana Cloud, Tempo, or OTLP collector
-meterProvider, err := metrics.InitMeterOTLP(ctx, "my-service", "1.0.0", "production", "localhost:4317")
+cfg := metrics.Config{
+	ServiceName:    "my-service",
+	ServiceVersion: "1.0.0",
+	Env:            "production",
+	ExporterType:   metrics.ExporterOTLP,
+	OTLPEndpoint:   "localhost:4317",
+	PushInterval:   30 * time.Second, // Optional, defaults to 30s
+}
+meterProvider, _, err := metrics.Init(ctx, cfg)
 defer meterProvider.Shutdown(ctx)
 
 // Metrics automatically pushed every 30 seconds
-```
-
-### Stdout (Development)
-
-```go
-// For debugging and development
-meterProvider, err := metrics.InitMeterStdout("my-service", "1.0.0", "dev")
-defer meterProvider.Shutdown(ctx)
-
-// Metrics printed to console every 10 seconds
 ```
 
 ## HTTP metrics
@@ -165,8 +214,8 @@ semconv.DeploymentEnvironment(env)
 
 ## Best practices
 
-- **Use `InitMeter()` for Prometheus** (most common case)
-- **Use `InitMeterOTLP()` for push model** (Grafana Cloud, etc.)
+- **Use `ExporterPrometheus` for development and pull-based monitoring**
+- **Use `ExporterOTLP` for production and push-based monitoring**
 - **Always call `defer meterProvider.Shutdown(ctx)`**
 - **Don't abuse label cardinality** (avoid user_id, ip as labels)
 - **Use fixed values for labels** (error type, HTTP status)

@@ -30,14 +30,27 @@ import (
 
 func main() {
     // Initialize logger with debug level for development
-    loggerProvider, otelLogger, err := logger.InitLoggerStdout("my-service", "1.0.0", "development", slog.LevelDebug)
+    cfg := logger.Config{
+        ServiceName:    "my-service",
+        ServiceVersion: "1.0.0",
+        Env:            "development",
+        Level:          slog.LevelDebug,
+        // Endpoint empty = stdout exporter
+    }
+    loggerProvider, otelLogger, err := logger.Init(context.Background(), cfg)
     if err != nil {
         log.Fatal(err)
     }
     defer loggerProvider.Shutdown(context.Background())
 
     // Initialize tracing for correlation
-    tracerProvider, err := tracing.InitTracer("my-service", "1.0.0", "development")
+    tracingCfg := tracing.Config{
+        ServiceName:    "my-service",
+        ServiceVersion: "1.0.0",
+        Env:            "development",
+        ExporterType:   tracing.ExporterStdout,
+    }
+    tracerProvider, err := tracing.Init(context.Background(), tracingCfg)
     if err != nil {
         log.Fatal(err)
     }
@@ -63,16 +76,28 @@ func main() {
     ctx := context.Background()
 
     // Initialize logger with OTLP and info level for production
-    loggerProvider, otelLogger, err := logger.InitLoggerOTLP(
-        ctx, "my-service", "1.0.0", "production", "localhost:4317", slog.LevelInfo)
+    cfg := logger.Config{
+        ServiceName:    "my-service",
+        ServiceVersion: "1.0.0",
+        Env:            "production",
+        Level:          slog.LevelInfo,
+        Endpoint:       "localhost:4317", // OTLP endpoint
+    }
+    loggerProvider, otelLogger, err := logger.Init(ctx, cfg)
     if err != nil {
         log.Fatal(err)
     }
     defer loggerProvider.Shutdown(context.Background())
 
     // Initialize tracing with OTLP
-    tracerProvider, err := tracing.InitTracerOTLP(
-        ctx, "my-service", "1.0.0", "production", "localhost:4317")
+    tracingCfg := tracing.Config{
+        ServiceName:    "my-service",
+        ServiceVersion: "1.0.0",
+        Env:            "production",
+        ExporterType:   tracing.ExporterOTLP,
+        OTLPEndpoint:   "localhost:4317",
+    }
+    tracerProvider, err := tracing.Init(ctx, tracingCfg)
     if err != nil {
         log.Fatal(err)
     }
@@ -93,45 +118,54 @@ func main() {
 
 ```go
 // High-traffic service - only warnings and errors
-loggerProvider, logger, err := logger.InitLoggerStdout("high-traffic-service", "1.0.0", "production", slog.LevelWarn)
+cfg := logger.Config{
+    ServiceName:    "high-traffic-service",
+    ServiceVersion: "1.0.0",
+    Env:            "production",
+    Level:          slog.LevelWarn,
+}
+loggerProvider, logger, err := logger.Init(context.Background(), cfg)
 
 // Error-only logging for critical services
-loggerProvider, logger, err := logger.InitLoggerOTLP(ctx, "critical-service", "1.0.0", "production", "localhost:4317", slog.LevelError)
+cfg = logger.Config{
+    ServiceName:    "critical-service",
+    ServiceVersion: "1.0.0",
+    Env:            "production",
+    Level:          slog.LevelError,
+    Endpoint:       "localhost:4317",
+}
+loggerProvider, logger, err = logger.Init(ctx, cfg)
 ```
 
 ## API Reference
 
-### Initialization Functions
+### Configuration
 
-#### `InitLoggerStdout(serviceName, serviceVersion, env string, level slog.Level) (*log.LoggerProvider, *slog.Logger, error)`
+```go
+type Config struct {
+    ServiceName    string
+    ServiceVersion string
+    Env            string
+    Level          slog.Level
+    Endpoint       string // OTLP endpoint. If empty, stdout exporter is used.
+}
+```
 
-Initializes logger with stdout exporter for development.
+### Initialization Function
 
-**Parameters:**
+#### `Init(ctx context.Context, cfg Config) (*log.LoggerProvider, *slog.Logger, error)`
 
-- `serviceName` - Service name for resource attributes
-- `serviceVersion` - Service version for resource attributes
-- `env` - Environment (development, staging, production)
-- `level` - Minimum log level (slog.LevelDebug, LevelInfo, LevelWarn, LevelError)
+Initializes logger with automatic exporter selection based on configuration.
 
-**Returns:**
+**Exporter Selection:**
 
-- `*log.LoggerProvider` - For shutdown management
-- `*slog.Logger` - OTel-integrated slog logger
-- `error` - Initialization error
-
-#### `InitLoggerOTLP(ctx context.Context, serviceName, serviceVersion, env, endpoint string, level slog.Level) (*log.LoggerProvider, *slog.Logger, error)`
-
-Initializes logger with OTLP exporter for production.
+- If `Endpoint` is empty: stdout exporter (development)
+- If `Endpoint` is set: OTLP exporter (production)
 
 **Parameters:**
 
 - `ctx` - Context for initialization
-- `serviceName` - Service name for resource attributes
-- `serviceVersion` - Service version for resource attributes
-- `env` - Environment (development, staging, production)
-- `endpoint` - OTLP collector endpoint (e.g., "localhost:4317")
-- `level` - Minimum log level (slog.LevelDebug, LevelInfo, LevelWarn, LevelError)
+- `cfg` - Logger configuration
 
 **Returns:**
 
@@ -174,13 +208,19 @@ Different log levels for different environments:
 
 ```go
 // Local development - see everything
-InitLoggerStdout("service", "1.0.0", "local", slog.LevelDebug)
+cfg := logger.Config{
+    ServiceName: "service", ServiceVersion: "1.0.0", Env: "local", Level: slog.LevelDebug,
+}
 
 // Production - info and above
-InitLoggerOTLP(ctx, "service", "1.0.0", "prod", endpoint, slog.LevelInfo)
+cfg = logger.Config{
+    ServiceName: "service", ServiceVersion: "1.0.0", Env: "prod", Level: slog.LevelInfo, Endpoint: "localhost:4317",
+}
 
 // High-traffic - warnings and errors only
-InitLoggerOTLP(ctx, "service", "1.0.0", "prod", endpoint, slog.LevelWarn)
+cfg = logger.Config{
+    ServiceName: "service", ServiceVersion: "1.0.0", Env: "prod", Level: slog.LevelWarn, Endpoint: "localhost:4317",
+}
 ```
 
 ### 3. Unified Observability
@@ -199,81 +239,6 @@ All three signals (logs, traces, metrics) use the same:
 - **Level filtering** - Efficient log processing
 - **Error handling** - Graceful degradation
 
-### 5. Standard slog Interface
-
-No custom logging methods - uses standard Go `log/slog` API with OTel enhancement.
-
-## Architecture
-
-```
-Application Code
-       ↓
-   slog.Logger (OTel bridge + level filter)
-       ↓
-   OTel LoggerProvider
-       ↓
-   BatchProcessor
-       ↓
-   Exporter (Stdout/OTLP)
-       ↓
-   Backend (Console/Collector)
-```
-
-## Integration with Other Components
-
-### With Tracing
-
-```go
-// Initialize both
-tracerProvider, _ := tracing.InitTracer("service", "1.0.0", "dev")
-loggerProvider, logger, _ := logger.InitLoggerStdout("service", "1.0.0", "dev", slog.LevelDebug)
-
-// Use together
-tracer := tracerProvider.Tracer("example")
-ctx, span := tracer.Start(context.Background(), "operation")
-defer span.End()
-
-// Log is automatically correlated with span
-logger.InfoContext(ctx, "operation completed")
-```
-
-### With Observability Facade
-
-```go
-// Using helper functions
-cfg := observability.NewLocalConfig("my-service", "1.0.0", true)  // debug level
-cfg := observability.NewProdConfig("my-service", "1.0.0", "localhost:4317", true)  // info level
-
-obs, err := observability.Setup(context.Background(), cfg)
-
-// obs.Logger is ready to use with trace correlation
-obs.Logger.InfoContext(ctx, "request processed")
-```
-
 ## Examples
 
-### Different Log Levels in Action
-
-```go
-logger, _, _ := logger.InitLoggerStdout("test-service", "1.0.0", "dev", slog.LevelWarn)
-
-// These won't be logged (below warn level)
-logger.DebugContext(ctx, "debug message")
-logger.InfoContext(ctx, "info message")
-
-// These will be logged
-logger.WarnContext(ctx, "warning message")
-logger.ErrorContext(ctx, "error message")
-```
-
-### Kubernetes Deployment
-
-```go
-// For Kubernetes, use stdout with appropriate level
-logger, _, _ := logger.InitLoggerStdout("k8s-service", "1.0.0", "production", slog.LevelInfo)
-
-// Logs go to stdout and are collected by k8s logging
-logger.InfoContext(ctx, "service started")
-```
-
-See `examples/main.go` for complete working examples of different configurations and log levels.
+See [examples/main.go](examples/main.go) for complete usage examples.

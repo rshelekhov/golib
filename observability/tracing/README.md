@@ -1,6 +1,6 @@
 # observability/tracing
 
-OpenTelemetry tracing for Go microservices: simple initialization following observability course patterns.
+OpenTelemetry tracing for Go microservices: simple initialization with automatic exporter selection.
 
 ## Quick start
 
@@ -13,8 +13,14 @@ import (
 )
 
 func main() {
-    // Standard pattern from observability courses
-    tracerProvider, err := tracing.InitTracer("my-service", "1.0.0", "development")
+    // Initialize with automatic exporter selection
+    cfg := tracing.Config{
+        ServiceName:    "my-service",
+        ServiceVersion: "1.0.0",
+        Env:            "development",
+        ExporterType:   tracing.ExporterStdout, // or tracing.ExporterOTLP
+    }
+    tracerProvider, err := tracing.Init(context.Background(), cfg)
     if err != nil {
         panic(err)
     }
@@ -27,13 +33,54 @@ func main() {
 }
 ```
 
-## Initialization Functions
+## Configuration
+
+```go
+type Config struct {
+    ServiceName    string
+    ServiceVersion string
+    Env            string
+    ExporterType   ExporterType
+    OTLPEndpoint   string // Used only when ExporterType is ExporterOTLP
+}
+
+type ExporterType string
+
+const (
+    ExporterStdout ExporterType = "stdout"
+    ExporterOTLP   ExporterType = "otlp"
+)
+```
+
+## Initialization
+
+### `Init(ctx context.Context, cfg Config) (*sdktrace.TracerProvider, error)`
+
+Unified initialization function that automatically selects the appropriate exporter.
+
+**Exporter Selection:**
+
+- `ExporterStdout`: Pretty-printed traces to stdout (development)
+- `ExporterOTLP`: Traces sent to OTLP collector (production)
+
+**Returns:**
+
+- `*sdktrace.TracerProvider` - For shutdown management
+- `error` - Initialization error
+
+## Exporter Types
 
 ### Stdout (Development)
 
 ```go
 // Standard pattern - stdout exporter with propagation setup
-tracerProvider, err := tracing.InitTracer("my-service", "1.0.0", "development")
+cfg := tracing.Config{
+    ServiceName:    "my-service",
+    ServiceVersion: "1.0.0",
+    Env:            "development",
+    ExporterType:   tracing.ExporterStdout,
+}
+tracerProvider, err := tracing.Init(ctx, cfg)
 defer tracerProvider.Shutdown(ctx)
 
 // Traces printed to stdout with pretty formatting
@@ -43,7 +90,14 @@ defer tracerProvider.Shutdown(ctx)
 
 ```go
 // OTLP exporter for production
-tracerProvider, err := tracing.InitTracerOTLP(ctx, "my-service", "1.0.0", "production", "localhost:4317")
+cfg := tracing.Config{
+    ServiceName:    "my-service",
+    ServiceVersion: "1.0.0",
+    Env:            "production",
+    ExporterType:   tracing.ExporterOTLP,
+    OTLPEndpoint:   "localhost:4317",
+}
+tracerProvider, err := tracing.Init(ctx, cfg)
 defer tracerProvider.Shutdown(ctx)
 
 // Traces sent to OTLP collector (Jaeger, Tempo, etc.)
@@ -51,7 +105,7 @@ defer tracerProvider.Shutdown(ctx)
 
 ## What's Configured Automatically
 
-Both initialization functions set up:
+The initialization function sets up:
 
 1. **TracerProvider** with proper resource attributes
 2. **Global TracerProvider** via `otel.SetTracerProvider()`
@@ -65,7 +119,7 @@ Both initialization functions set up:
 
 ## Resource Attributes
 
-All functions automatically set:
+All initialization automatically sets:
 
 ```go
 semconv.ServiceName(serviceName)
@@ -149,16 +203,29 @@ span.SetAttributes(
 
 ```go
 // For production
-tracerProvider, err := tracing.InitTracerOTLP(ctx, "my-service", "1.0.0", "production", "localhost:4317")
+cfg := tracing.Config{
+    ServiceName:    "my-service",
+    ServiceVersion: "1.0.0",
+    Env:            "production",
+    ExporterType:   tracing.ExporterOTLP,
+    OTLPEndpoint:   "localhost:4317",
+}
+tracerProvider, err := tracing.Init(ctx, cfg)
 
 // For development
-tracerProvider, err := tracing.InitTracer("my-service", "1.0.0", "development")
+cfg = tracing.Config{
+    ServiceName:    "my-service",
+    ServiceVersion: "1.0.0",
+    Env:            "development",
+    ExporterType:   tracing.ExporterStdout,
+}
+tracerProvider, err = tracing.Init(ctx, cfg)
 ```
 
 ## Best Practices
 
-- **Use `InitTracer()`** for development (stdout output)
-- **Use `InitTracerOTLP()`** for production (OTLP collector)
+- **Use `ExporterStdout`** for development (stdout output)
+- **Use `ExporterOTLP`** for production (OTLP collector)
 - **Always call `defer tracerProvider.Shutdown(ctx)`**
 - **Propagation is configured automatically** - no manual setup needed
 - **Always close span** through `defer span.End()`

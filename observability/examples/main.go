@@ -33,13 +33,13 @@ func main() {
 
 // Example 1: Local development with default debug logging
 func localExample() {
-	// Using simplified API - debug level by default for local
-	cfg, err := observability.NewConfig(observability.EnvLocal, "my-service", "1.2.3", true, "")
+	// Using simplified API - debug level by default for local, metrics always disabled
+	cfg, err := observability.NewConfig(observability.EnvLocal, "my-service", "1.2.3", false, "")
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	obs, err := observability.Setup(context.Background(), cfg)
+	obs, err := observability.Init(context.Background(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -49,9 +49,8 @@ func localExample() {
 		}
 	}()
 
-	// Setup HTTP server with metrics endpoint
-	http.Handle("/metrics", obs.MetricsHandler) // Prometheus scrapes this
-	http.Handle("/", metrics.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Simple HTTP server (no metrics - they're disabled for local)
+	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Debug level logs will be shown in local development
 		obs.Logger.DebugContext(r.Context(), "processing request", "path", r.URL.Path)
 		obs.Logger.InfoContext(r.Context(), "handling request")
@@ -59,13 +58,12 @@ func localExample() {
 		if _, err := w.Write([]byte("Hello from local development!")); err != nil {
 			log.Printf("Error writing response: %v", err)
 		}
-	})))
+	}))
 
-	// gRPC server
+	// gRPC server (no metrics interceptor)
 	go func() {
 		server := grpc.NewServer(
 			grpc.StatsHandler(tracing.GRPCServerStatsHandler()),
-			grpc.UnaryInterceptor(metrics.UnaryServerInterceptor()),
 		)
 
 		lis, err := net.Listen("tcp", ":50051")
@@ -80,7 +78,7 @@ func localExample() {
 	}()
 
 	log.Printf("Traces printed to stdout with DEBUG level")
-	log.Printf("Prometheus metrics available at http://localhost:8080/metrics")
+	log.Printf("Metrics are disabled for local development")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -94,7 +92,7 @@ func prodExample() {
 		log.Fatal(err)
 	}
 
-	obs, err := observability.Setup(context.Background(), cfg)
+	obs, err := observability.Init(context.Background(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -129,14 +127,14 @@ func prodExample() {
 func customLogLevelExample() {
 	// Override local environment to use warn level instead of debug
 	cfg, err := observability.NewConfig(
-		observability.EnvLocal, "k8s-service", "1.0.0", true, "",
+		observability.EnvLocal, "k8s-service", "1.0.0", false, "",
 		slog.LevelWarn, // Override default debug level
 	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	obs, err := observability.Setup(context.Background(), cfg)
+	obs, err := observability.Init(context.Background(), cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -146,7 +144,7 @@ func customLogLevelExample() {
 		}
 	}()
 
-	http.Handle("/metrics", obs.MetricsHandler)
+	// No metrics endpoint - disabled for local development
 	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// These won't be logged (below warn level)
 		obs.Logger.DebugContext(r.Context(), "debug message")
@@ -161,6 +159,7 @@ func customLogLevelExample() {
 	}))
 
 	log.Printf("Using WARN level - only warnings and errors will be logged")
+	log.Printf("Metrics are disabled for local development")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
@@ -194,35 +193,55 @@ func errorHandlingExample() {
 //
 //nolint:unused // Example function
 func manualExample() {
+	ctx := context.Background()
+
 	// Initialize tracing manually
-	tracerProvider, err := tracing.InitTracer("my-service", "1.0.0", "development")
+	tracingCfg := tracing.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		ExporterType:   tracing.ExporterStdout,
+	}
+	tracerProvider, err := tracing.Init(ctx, tracingCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer func() {
-		if err := tracerProvider.Shutdown(context.Background()); err != nil {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down tracer: %v", err)
 		}
 	}()
 
 	// Initialize metrics manually
-	meterProvider, handler, err := metrics.InitMeter("my-service", "1.0.0", "development")
+	metricsCfg := metrics.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		ExporterType:   metrics.ExporterPrometheus,
+	}
+	meterProvider, handler, err := metrics.Init(ctx, metricsCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer func() {
-		if err := meterProvider.Shutdown(context.Background()); err != nil {
+		if err := meterProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down meter: %v", err)
 		}
 	}()
 
 	// Setup logger manually with custom level
-	loggerProvider, otelLogger, err := logger.InitLoggerStdout("my-service", "1.0.0", "development", slog.LevelError)
+	loggerCfg := logger.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		Level:          slog.LevelError,
+	}
+	loggerProvider, otelLogger, err := logger.Init(ctx, loggerCfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer func() {
-		if err := loggerProvider.Shutdown(context.Background()); err != nil {
+		if err := loggerProvider.Shutdown(ctx); err != nil {
 			log.Printf("Error shutting down logger: %v", err)
 		}
 	}()
