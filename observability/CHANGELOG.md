@@ -5,6 +5,20 @@ All notable changes to the Observability package will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.2] - 2025-06-28
+
+### Changed
+
+- **Dependencies**: Reorganized OpenTelemetry dependencies
+  - Moved `go.opentelemetry.io/contrib/bridges/otelslog` to direct dependencies
+  - Moved `go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc` to direct dependencies
+  - Moved `go.opentelemetry.io/otel/exporters/stdout/stdoutlog` to direct dependencies
+  - Moved `go.opentelemetry.io/otel/log` to direct dependencies
+  - Moved `go.opentelemetry.io/otel/sdk/log` to direct dependencies
+  - Moved `google.golang.org/protobuf` to direct dependencies
+- **Removed**: `github.com/fatih/color` dependency (no longer needed)
+- **Removed**: `go.opentelemetry.io/otel/exporters/stdout/stdoutmetric` dependency (not used)
+
 ## [1.3.1] - 2025-06-28
 
 ### Added
