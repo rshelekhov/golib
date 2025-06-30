@@ -34,7 +34,13 @@ func main() {
 // Example 1: Local development with default debug logging
 func localExample() {
 	// Using simplified API - debug level by default for local, metrics always disabled
-	cfg, err := observability.NewConfig(observability.EnvLocal, "my-service", "1.2.3", false, "")
+	cfg, err := observability.NewConfig(observability.ConfigParams{
+		Env:            observability.EnvLocal,
+		ServiceName:    "my-service",
+		ServiceVersion: "1.2.3",
+		EnableMetrics:  false,
+		OTLPEndpoint:   "",
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -87,7 +93,13 @@ func localExample() {
 //nolint:unused // Example function
 func prodExample() {
 	// Production with default info level
-	cfg, err := observability.NewConfig(observability.EnvProd, "my-service", "1.2.3", true, "localhost:4317")
+	cfg, err := observability.NewConfig(observability.ConfigParams{
+		Env:            observability.EnvProd,
+		ServiceName:    "my-service",
+		ServiceVersion: "1.2.3",
+		EnableMetrics:  true,
+		OTLPEndpoint:   "localhost:4317",
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -127,8 +139,14 @@ func prodExample() {
 func customLogLevelExample() {
 	// Override local environment to use warn level instead of debug
 	cfg, err := observability.NewConfig(
-		observability.EnvLocal, "k8s-service", "1.0.0", false, "",
-		slog.LevelWarn, // Override default debug level
+		observability.ConfigParams{
+			Env:            observability.EnvLocal,
+			ServiceName:    "my-service",
+			ServiceVersion: "1.0.0",
+			EnableMetrics:  false,
+			OTLPEndpoint:   "",
+		},
+		observability.WithLogLevel(slog.LevelWarn), // Override default debug level
 	)
 	if err != nil {
 		log.Fatal(err)
@@ -168,21 +186,39 @@ func customLogLevelExample() {
 //nolint:unused // Example function
 func errorHandlingExample() {
 	// This will fail - unknown environment
-	cfg, err := observability.NewConfig("staging", "my-service", "1.0.0", true, "")
+	cfg, err := observability.NewConfig(observability.ConfigParams{
+		Env:            "staging",
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		EnableMetrics:  true,
+		OTLPEndpoint:   "localhost:4317",
+	})
 	if err != nil {
 		log.Printf("Expected error: %v", err)
 		// Output: unsupported environment: staging (supported: local, dev, prod)
 	}
 
 	// This will fail - missing OTLP endpoint for prod
-	cfg, err = observability.NewConfig(observability.EnvProd, "my-service", "1.0.0", true, "")
+	cfg, err = observability.NewConfig(observability.ConfigParams{
+		Env:            observability.EnvProd,
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		EnableMetrics:  true,
+		OTLPEndpoint:   "", // Missing endpoint
+	})
 	if err != nil {
 		log.Printf("Expected error: %v", err)
 		// Output: OTLP endpoint is required for environment prod
 	}
 
 	// This will succeed
-	cfg, err = observability.NewConfig(observability.EnvProd, "my-service", "1.0.0", true, "localhost:4317")
+	cfg, err = observability.NewConfig(observability.ConfigParams{
+		Env:            observability.EnvProd,
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		EnableMetrics:  true,
+		OTLPEndpoint:   "localhost:4317",
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -212,6 +248,24 @@ func manualExample() {
 		}
 	}()
 
+	// Initialize logger manually
+	loggerCfg := logger.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		Level:          slog.LevelDebug,
+		Endpoint:       "", // Use stdout
+	}
+	loggerProvider, otelLogger, err := logger.Init(ctx, loggerCfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := loggerProvider.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down logger: %v", err)
+		}
+	}()
+
 	// Initialize metrics manually
 	metricsCfg := metrics.Config{
 		ServiceName:    "my-service",
@@ -225,24 +279,7 @@ func manualExample() {
 	}
 	defer func() {
 		if err := meterProvider.Shutdown(ctx); err != nil {
-			log.Printf("Error shutting down meter: %v", err)
-		}
-	}()
-
-	// Setup logger manually with custom level
-	loggerCfg := logger.Config{
-		ServiceName:    "my-service",
-		ServiceVersion: "1.0.0",
-		Env:            "development",
-		Level:          slog.LevelError,
-	}
-	loggerProvider, otelLogger, err := logger.Init(ctx, loggerCfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() {
-		if err := loggerProvider.Shutdown(ctx); err != nil {
-			log.Printf("Error shutting down logger: %v", err)
+			log.Printf("Error shutting down metrics: %v", err)
 		}
 	}()
 
@@ -255,18 +292,18 @@ func manualExample() {
 
 	http.Handle("/metrics", handler)
 	http.Handle("/", metrics.Middleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Only errors will be logged
-		otelLogger.InfoContext(r.Context(), "this won't be logged")
-		otelLogger.ErrorContext(r.Context(), "error message - this will be logged")
+		// Use the custom logger
+		otelLogger.InfoContext(r.Context(), "handling request", "path", r.URL.Path)
 
 		// Increment custom counter
 		counter.Add(r.Context(), 1)
 
-		if _, err := w.Write([]byte("Manual setup with error-level logging!")); err != nil {
+		if _, err := w.Write([]byte("Manual setup complete!")); err != nil {
 			log.Printf("Error writing response: %v", err)
 		}
 	})))
 
-	log.Printf("Manual setup with ERROR level logging")
+	log.Printf("Manual setup with all components initialized separately")
+	log.Printf("Metrics available at http://localhost:8080/metrics")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

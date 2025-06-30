@@ -23,7 +23,13 @@ import (
 
 func main() {
 	// Simple initialization for local development (metrics always disabled)
-	cfg, err := observability.NewConfig(observability.EnvLocal, "my-service", "1.0.0", false, "")
+	cfg, err := observability.NewConfig(observability.ConfigParams{
+		Env:            observability.EnvLocal,
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		EnableMetrics:  false,
+		OTLPEndpoint:   "",
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -59,7 +65,13 @@ func main() {
 ```go
 func main() {
 	// Production setup with default info logging and OTLP
-	cfg, err := observability.NewConfig(observability.EnvProd, "my-service", "1.0.0", true, "localhost:4317")
+	cfg, err := observability.NewConfig(observability.ConfigParams{
+		Env:            observability.EnvProd,
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		EnableMetrics:  true,
+		OTLPEndpoint:   "localhost:4317",
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,8 +93,14 @@ func main() {
 ```go
 // Override environment default log level
 cfg, err := observability.NewConfig(
-	observability.EnvLocal, "k8s-service", "1.0.0", true, "",
-	slog.LevelWarn, // Override default debug level to warn
+	observability.ConfigParams{
+		Env:            observability.EnvLocal,
+		ServiceName:    "k8s-service",
+		ServiceVersion: "1.0.0",
+		EnableMetrics:  false,
+		OTLPEndpoint:   "",
+	},
+	observability.WithLogLevel(slog.LevelWarn), // Override default debug level to warn
 )
 
 obs, err := observability.Init(context.Background(), cfg)
@@ -92,13 +110,25 @@ obs, err := observability.Init(context.Background(), cfg)
 
 ```go
 // This will return an error - unknown environment
-cfg, err := observability.NewConfig("staging", "my-service", "1.0.0", true, "")
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:            "staging",
+	ServiceName:    "my-service",
+	ServiceVersion: "1.0.0",
+	EnableMetrics:  true,
+	OTLPEndpoint:   "localhost:4317",
+})
 if err != nil {
 	log.Fatal(err) // "unsupported environment: staging (supported: local, dev, prod)"
 }
 
 // This will return an error - missing OTLP endpoint for prod
-cfg, err = observability.NewConfig(observability.EnvProd, "my-service", "1.0.0", true, "")
+cfg, err = observability.NewConfig(observability.ConfigParams{
+	Env:            observability.EnvProd,
+	ServiceName:    "my-service",
+	ServiceVersion: "1.0.0",
+	EnableMetrics:  true,
+	OTLPEndpoint:   "", // Missing endpoint
+})
 if err != nil {
 	log.Fatal(err) // "OTLP endpoint is required for environment prod"
 }
@@ -123,7 +153,13 @@ Then use OTLP in your application:
 
 ```go
 // Use OTLP to send all data to the stack
-cfg, err := observability.NewConfig(observability.EnvDev, "my-service", "1.0.0", true, "localhost:4317")
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:            observability.EnvDev,
+	ServiceName:    "my-service",
+	ServiceVersion: "1.0.0",
+	EnableMetrics:  true,
+	OTLPEndpoint:   "localhost:4317",
+})
 if err != nil {
 	log.Fatal(err)
 }
@@ -137,18 +173,49 @@ See [infrastructure/README.md](infrastructure/README.md) for setup guide, troubl
 ### Simplified Configuration API
 
 ```go
-// NewConfig(env, serviceName, serviceVersion, enableMetrics, otlpEndpoint, logLevel...)
-// Optional logLevel parameter overrides environment defaults
+// Using ConfigParams struct with optional functional options
+// ConfigParams provides type safety and clear parameter names
 
 // Local development with default debug logging (metrics always disabled)
-cfg, err := observability.NewConfig(observability.EnvLocal, "service-name", "1.0.0", false, "")
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:            observability.EnvLocal,
+	ServiceName:    "service-name",
+	ServiceVersion: "1.0.0",
+	EnableMetrics:  false,
+	OTLPEndpoint:   "",
+})
 
 // Production with default info logging
-cfg, err := observability.NewConfig(observability.EnvProd, "service-name", "1.0.0", true, "localhost:4317")
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:            observability.EnvProd,
+	ServiceName:    "service-name",
+	ServiceVersion: "1.0.0",
+	EnableMetrics:  true,
+	OTLPEndpoint:   "localhost:4317",
+})
 
-// Override log level for any environment
-cfg, err := observability.NewConfig(observability.EnvLocal, "service-name", "1.0.0", true, "", slog.LevelWarn)
-cfg, err := observability.NewConfig(observability.EnvProd, "service-name", "1.0.0", true, "endpoint", slog.LevelError)
+// Override log level for any environment using functional options
+cfg, err := observability.NewConfig(
+	observability.ConfigParams{
+		Env:            observability.EnvLocal,
+		ServiceName:    "service-name",
+		ServiceVersion: "1.0.0",
+		EnableMetrics:  false,
+		OTLPEndpoint:   "",
+	},
+	observability.WithLogLevel(slog.LevelWarn),
+)
+
+cfg, err := observability.NewConfig(
+	observability.ConfigParams{
+		Env:            observability.EnvProd,
+		ServiceName:    "service-name",
+		ServiceVersion: "1.0.0",
+		EnableMetrics:  true,
+		OTLPEndpoint:   "endpoint",
+	},
+	observability.WithLogLevel(slog.LevelError),
+)
 ```
 
 ### Environment Defaults
@@ -169,8 +236,15 @@ cfg := observability.Config{
 	LogLevel:       slog.LevelDebug,
 }
 
-// Always validate manually created configs
-if err := cfg.Validate(); err != nil {
+// Manual configs don't get automatic validation - need to validate parameters manually
+params := observability.ConfigParams{
+	Env:            cfg.Env,
+	ServiceName:    cfg.ServiceName,
+	ServiceVersion: cfg.ServiceVersion,
+	EnableMetrics:  cfg.EnableMetrics,
+	OTLPEndpoint:   cfg.OTLPEndpoint,
+}
+if err := params.Validate(); err != nil {
 	log.Fatal(err)
 }
 ```
@@ -245,7 +319,8 @@ See [examples/main.go](examples/main.go) for complete working examples of:
 
 ## Best practices
 
-- **Use helper functions** - `NewLocalConfig()`, `NewProdConfig()` for typical setups
+- **Use ConfigParams struct** - type-safe configuration with clear parameter names
+- **Use functional options** - override environment defaults when needed
 - **Use `observability.Init()`** - automatically chooses stdout or OTLP based on env
 - **Adjust log levels** - Debug for local, Info for production, Warn for high-traffic services
 - **Always call `defer obs.Shutdown(ctx)`** for proper cleanup

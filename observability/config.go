@@ -27,26 +27,39 @@ type Config struct {
 	LogLevel       slog.Level
 }
 
-func (c Config) Validate() error {
+type ConfigParams struct {
+	Env            string
+	ServiceName    string
+	ServiceVersion string
+	EnableMetrics  bool
+	OTLPEndpoint   string
+}
+
+func (c ConfigParams) Validate() error {
+	var errMessages []string
+
 	if c.ServiceName == "" {
-		return fmt.Errorf("service name is required")
+		errMessages = append(errMessages, "service name is required")
 	}
 	if c.ServiceVersion == "" {
-		return fmt.Errorf("service version is required")
+		errMessages = append(errMessages, "service version is required")
 	}
 	if c.Env == "" {
-		return fmt.Errorf("environment is required")
+		errMessages = append(errMessages, "environment is required")
 	}
 	if _, ok := supportedEnvs[c.Env]; !ok {
-		return fmt.Errorf("unsupported environment: %s (supported: %s)", c.Env, strings.Join(getSupportedEnvs(), ", "))
+		errMessages = append(errMessages, fmt.Sprintf("unsupported environment: %s (supported: %s)", c.Env, strings.Join(getSupportedEnvs(), ", ")))
 	}
 	if c.requiresOTLPEndpoint() && c.OTLPEndpoint == "" {
-		return fmt.Errorf("OTLP endpoint is required for environment %s", c.Env)
+		errMessages = append(errMessages, fmt.Sprintf("OTLP endpoint is required for environment %s", c.Env))
+	}
+	if len(errMessages) > 0 {
+		return fmt.Errorf("%s", strings.Join(errMessages, "; "))
 	}
 	return nil
 }
 
-func (c Config) requiresOTLPEndpoint() bool {
+func (c ConfigParams) requiresOTLPEndpoint() bool {
 	return c.Env == EnvDev || c.Env == EnvProd
 }
 
@@ -67,24 +80,35 @@ func getDefaultLogLevel(env string) slog.Level {
 	}
 }
 
-// NewConfig creates config with environment-based defaults and optional log level override
-func NewConfig(env, serviceName, serviceVersion string, enableMetrics bool, otlpEndpoint string, logLevel ...slog.Level) (Config, error) {
-	level := getDefaultLogLevel(env)
-	if len(logLevel) > 0 {
-		level = logLevel[0]
+// Option defines a functional option for Config
+type Option func(*Config)
+
+// WithLogLevel sets a custom log level, overriding environment defaults
+func WithLogLevel(level slog.Level) Option {
+	return func(cfg *Config) {
+		cfg.LogLevel = level
+	}
+}
+
+// NewConfig creates config with environment-based defaults and optional overrides
+func NewConfig(params ConfigParams, opts ...Option) (Config, error) {
+	if err := params.Validate(); err != nil {
+		return Config{}, err
 	}
 
 	cfg := Config{
-		Env:            env,
-		ServiceName:    serviceName,
-		ServiceVersion: serviceVersion,
-		EnableMetrics:  enableMetrics,
-		OTLPEndpoint:   otlpEndpoint,
-		LogLevel:       level,
+		Env:            params.Env,
+		ServiceName:    params.ServiceName,
+		ServiceVersion: params.ServiceVersion,
+		EnableMetrics:  params.EnableMetrics,
+		OTLPEndpoint:   params.OTLPEndpoint,
+		LogLevel:       getDefaultLogLevel(params.Env),
 	}
 
-	if err := cfg.Validate(); err != nil {
-		return Config{}, err
+	// Apply options
+	for _, opt := range opts {
+		opt(&cfg)
 	}
+
 	return cfg, nil
 }

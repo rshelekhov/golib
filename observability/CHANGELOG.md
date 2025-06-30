@@ -5,6 +5,23 @@ All notable changes to the Observability package will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.3] - 2025-06-30
+
+### Changed
+
+- **BREAKING**: Improved `NewConfig` API with structured parameters
+  - Replaced positional parameters with `ConfigParams` struct for better type safety
+  - Added functional options pattern for optional parameters
+  - `NewConfig(params ConfigParams, opts ...Option)` instead of `NewConfig(env, serviceName, serviceVersion, enableMetrics, otlpEndpoint, opts...)`
+- **Enhanced type safety**: `ConfigParams` struct provides clear field names and compile-time validation
+
+### Documentation
+
+- Updated README.md with new ConfigParams API examples
+- Updated examples/main.go to demonstrate new API usage
+- Enhanced documentation with clearer parameter descriptions
+- Added examples showing both basic and advanced configuration patterns
+
 ## [1.3.2] - 2025-06-28
 
 ### Changed
