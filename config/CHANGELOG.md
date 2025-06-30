@@ -1,12 +1,12 @@
 # Changelog
 
-## v2.0.0
+## v1.1.0
 
-### Breaking Changes
+### Changes
 
-- **BREAKING**: Replaced viper with cristalhq/aconfig for better performance and simpler configuration
-- **BREAKING**: Changed struct tags from `mapstructure` to `yaml`
-- **BREAKING**: Removed viper-specific options (`WithEnvPrefix`, `WithConfigName`, `WithConfigType`)
+- Replaced viper with cristalhq/aconfig for better performance and simpler configuration
+- Changed struct tags from `mapstructure` to `yaml`
+- Removed viper-specific options (`WithEnvPrefix`, `WithConfigName`, `WithConfigType`)
 
 ### New Features
 
