@@ -54,7 +54,6 @@ func WithSearchPaths(paths []string) Option {
 
 func MustLoad[T any](opts ...Option) *T {
 	cfg := new(T)
-	configPath := fetchConfigPath()
 
 	// Default loader config
 	loaderCfg := &LoaderConfig{
@@ -68,6 +67,8 @@ func MustLoad[T any](opts ...Option) *T {
 	for _, opt := range opts {
 		opt(loaderCfg)
 	}
+
+	configPath := fetchConfigPath(loaderCfg.SkipFlags)
 
 	var files []string
 
@@ -104,11 +105,25 @@ func MustLoad[T any](opts ...Option) *T {
 	return cfg
 }
 
-func fetchConfigPath() string {
+func fetchConfigPath(skipFlags bool) string {
 	var v string
-	flag.StringVar(&v, "config", "", "path to config file")
-	flag.Parse()
 
+	if !skipFlags {
+		// Check if flag is already defined
+		if flag.Lookup("config") == nil {
+			flag.StringVar(&v, "config", "", "path to config file")
+			if !flag.Parsed() {
+				flag.Parse()
+			}
+		}
+	}
+
+	// If flag exists, get its value
+	if configFlag := flag.Lookup("config"); configFlag != nil {
+		v = configFlag.Value.String()
+	}
+
+	// Fallback to environment variable
 	if v == "" {
 		v = os.Getenv(CONFIG_PATH)
 	}

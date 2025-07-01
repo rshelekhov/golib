@@ -8,8 +8,9 @@ Flexible configuration loader for Go with auto-discovery and multiple formats.
 - Auto-discovery of config files
 - YAML and .env file support
 - Multiple config files merging
-- Flag-based config path override
-- Environment variables integration
+- Flag-based config path override with smart flag handling
+- Environment variables integration with `CONFIG_PATH` support
+- Robust error handling with detailed error messages
 
 ## Installation
 
@@ -59,10 +60,19 @@ DATABASE_PORT=5432
 
 ### Configuration Priority
 
-1. Command-line flag: `./app -config ./config.yaml`
+1. Command-line flag: `./app -config ./config.yaml` (automatically defined if not exists)
 2. Environment variable: `CONFIG_PATH=/path/to/config.yaml`
 3. Explicit files via `WithFiles()`
-4. Auto-discovered files
+4. Auto-discovered files in search paths
+
+### Smart Flag Handling
+
+The loader automatically handles the `-config` flag:
+
+- Defines the flag if it doesn't already exist
+- Safely works with pre-existing flag definitions
+- Parses flags only when necessary
+- Falls back to `CONFIG_PATH` environment variable
 
 ### Options
 
@@ -72,6 +82,7 @@ cfg := config.MustLoad[AppConfig](
     config.WithMergeFiles(true),
     config.WithSearchPaths([]string{"./custom/*.yaml"}),
     config.WithAllowUnknownFields(false),
+    config.WithSkipFlags(false), // Enable flag parsing
 )
 ```
 
@@ -79,9 +90,17 @@ cfg := config.MustLoad[AppConfig](
 
 - `WithFiles([]string)` - explicit config files
 - `WithMergeFiles(bool)` - merge multiple files (default: true)
-- `WithSearchPaths([]string)` - custom search paths
+- `WithSearchPaths([]string)` - custom search paths for auto-discovery
 - `WithAllowUnknownFields(bool)` - allow unknown fields (default: true)
 - `WithSkipFlags(bool)` - skip CLI flags parsing (default: true)
+
+### Error Handling
+
+The loader provides detailed error messages:
+
+- Shows which files were attempted to load
+- Lists search paths when no files are found
+- Reports configuration loading failures with context
 
 ### Struct Tags
 
@@ -95,6 +114,21 @@ type Config struct {
         Port int    `yaml:"port"`
     } `yaml:"database"`
 }
+```
+
+### Environment Variables
+
+Set configuration path via environment:
+
+```bash
+export CONFIG_PATH=/path/to/config.yaml
+./app
+```
+
+Or use command-line flag:
+
+```bash
+./app -config /path/to/config.yaml
 ```
 
 ### Kubernetes
