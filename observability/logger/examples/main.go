@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"time"
 
 	"github.com/rshelekhov/golib/observability/logger"
 	"github.com/rshelekhov/golib/observability/tracing"
@@ -16,6 +17,9 @@ func main() {
 
 	// Example 2: OTLP logger
 	// otlpExample()
+
+	// Example 3: Pretty logger for local development
+	prettyExample()
 }
 
 func stdoutExample() {
@@ -118,4 +122,47 @@ func otlpExample() {
 	otelLogger.ErrorContext(ctx, "OTLP processing failed", "error", "network timeout")
 
 	fmt.Println("Logs and traces sent to OTLP collector!")
+}
+
+func prettyExample() {
+	ctx := context.Background()
+
+	// Initialize logger with pretty handler for local development
+	loggerCfg := logger.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "local",
+		Level:          slog.LevelDebug,
+	}
+
+	// Note: LoggerProvider will be nil for local env since we use pretty handler
+	_, prettyLogger, err := logger.Init(ctx, loggerCfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("\n=== Pretty Logger Example ===")
+
+	// Test different log levels with attributes
+	prettyLogger.Debug("Debug message", "user_id", 123, "action", "login")
+	prettyLogger.Info("User logged in", "user_id", 123, "email", "user@example.com", "ip", "192.168.1.1")
+	prettyLogger.Warn("Rate limit approaching", "user_id", 123, "requests", 95, "limit", 100)
+	prettyLogger.Error("Database connection failed", "error", "connection timeout", "retries", 3)
+
+	// Example with structured data
+	prettyLogger.Info("Order processed",
+		"order_id", "ord_123456",
+		"customer_id", 789,
+		"amount", 99.99,
+		"currency", "USD",
+		"items", []string{"item1", "item2", "item3"},
+		"timestamp", time.Now(),
+	)
+
+	// Example with grouped attributes
+	groupedLogger := prettyLogger.With("service", "payment", "version", "v2.1.0")
+	groupedLogger.Info("Payment processed", "transaction_id", "tx_789", "status", "success")
+	groupedLogger.Error("Payment failed", "transaction_id", "tx_790", "reason", "insufficient funds")
+
+	fmt.Println("=== End Pretty Logger Example ===")
 }

@@ -5,14 +5,72 @@ OpenTelemetry-integrated structured logging with automatic trace correlation and
 ## Features
 
 - **OpenTelemetry Logs API** - Full OTel logs integration
+- **Pretty local logging** - Colorized, human-readable output for local development
 - **Automatic trace correlation** - Logs automatically include trace_id and span_id
 - **Structured logging** - Built on Go's `log/slog`
-- **Multiple exporters** - Stdout for development, OTLP for production
+- **Multiple exporters** - Pretty handler for local, stdout for development, OTLP for production
 - **Configurable log levels** - Debug, Info, Warn, Error filtering
 - **Batched processing** - Efficient log delivery
 - **Resource attributes** - Service name, version, environment
 
 ## Quick Start
+
+### Local Development (Pretty Logs)
+
+```go
+package main
+
+import (
+    "context"
+    "log"
+    "log/slog"
+
+    "github.com/rshelekhov/golib/observability/logger"
+)
+
+func main() {
+    // Initialize logger with pretty handler for local development
+    cfg := logger.Config{
+        ServiceName:    "my-service",
+        ServiceVersion: "1.0.0",
+        Env:            "local",
+        Level:          slog.LevelDebug,
+        // Endpoint not needed for local - uses pretty handler
+    }
+
+    // Note: LoggerProvider will be nil for local env
+    _, prettyLogger, err := logger.Init(context.Background(), cfg)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Colorized output with structured data
+    prettyLogger.Debug("Debug message", "user_id", 123, "action", "login")
+    prettyLogger.Info("User logged in", "user_id", 123, "email", "user@example.com")
+    prettyLogger.Warn("Rate limit approaching", "user_id", 123, "requests", 95)
+    prettyLogger.Error("Database connection failed", "error", "connection timeout")
+}
+```
+
+Output:
+
+```
+[13:45:05.123] DEBUG: Debug message {
+  "action": "login",
+  "user_id": 123
+}
+[13:45:05.124] INFO: User logged in {
+  "email": "user@example.com",
+  "user_id": 123
+}
+[13:45:05.125] WARN: Rate limit approaching {
+  "requests": 95,
+  "user_id": 123
+}
+[13:45:05.126] ERROR: Database connection failed {
+  "error": "connection timeout"
+}
+```
 
 ### Development (Stdout)
 
@@ -159,6 +217,7 @@ Initializes logger with automatic exporter selection based on configuration.
 
 **Exporter Selection:**
 
+- If `Env` is "local": pretty handler (colorized, human-readable)
 - If `Endpoint` is empty: stdout exporter (development)
 - If `Endpoint` is set: OTLP exporter (production)
 
@@ -169,7 +228,7 @@ Initializes logger with automatic exporter selection based on configuration.
 
 **Returns:**
 
-- `*log.LoggerProvider` - For shutdown management
+- `*log.LoggerProvider` - For shutdown management (nil for local env)
 - `*slog.Logger` - OTel-integrated slog logger
 - `error` - Initialization error
 
@@ -194,20 +253,29 @@ logger.ErrorContext(ctx, "error", "error", err)             // Level 8
 
 ## Key Benefits
 
-### 1. Automatic Trace Correlation
+### 1. Pretty Local Development
 
-When logging within an active span, logs automatically include:
+For `Env: "local"`:
+
+- **Colorized output** - Different colors for each log level
+- **Human-readable format** - Easy to scan timestamps and messages
+- **Structured data** - JSON-formatted attributes with proper indentation
+- **No OpenTelemetry overhead** - Direct output, no batching or network calls
+
+### 2. Automatic Trace Correlation
+
+When logging within an active span (non-local environments), logs automatically include:
 
 - `trace_id` - Links log to distributed trace
 - `span_id` - Links log to specific span
 - Service resource attributes
 
-### 2. Configurable Log Levels
+### 3. Configurable Log Levels
 
 Different log levels for different environments:
 
 ```go
-// Local development - see everything
+// Local development - see everything, pretty format
 cfg := logger.Config{
     ServiceName: "service", ServiceVersion: "1.0.0", Env: "local", Level: slog.LevelDebug,
 }
@@ -223,7 +291,7 @@ cfg = logger.Config{
 }
 ```
 
-### 3. Unified Observability
+### 4. Unified Observability
 
 All three signals (logs, traces, metrics) use the same:
 
@@ -231,7 +299,7 @@ All three signals (logs, traces, metrics) use the same:
 - Resource attributes
 - Correlation context
 
-### 4. Production Ready
+### 5. Production Ready
 
 - **Batched processing** - Logs sent in efficient batches
 - **Async delivery** - Non-blocking log processing

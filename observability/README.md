@@ -4,7 +4,7 @@ Library for logging, tracing and metrics in Go microservices and projects.
 
 ## Features
 
-- **Logging** (slog, trace_id/span_id automatically, configurable log levels)
+- **Logging** (slog, pretty colorized output for local, trace_id/span_id automatically, configurable log levels)
 - **Tracing** (OpenTelemetry, stdout/OTLP exporters, propagation setup)
 - **Metrics** (OpenTelemetry + Prometheus/OTLP exporters)
 
@@ -46,7 +46,7 @@ func main() {
 
 	// Simple HTTP server (no metrics - they're disabled for local)
 	http.Handle("/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Debug logs will be shown in local development
+		// Pretty colorized logs will be shown in local development
 		obs.Logger.DebugContext(r.Context(), "processing request", "path", r.URL.Path)
 		obs.Logger.InfoContext(r.Context(), "hello world")
 		if _, err := w.Write([]byte("ok")); err != nil {
@@ -56,6 +56,7 @@ func main() {
 
 	log.Printf("HTTP server listening on :8080")
 	log.Printf("Metrics are disabled for local development")
+	log.Printf("Logs use pretty colorized format for better readability")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 ```
@@ -220,7 +221,7 @@ cfg, err := observability.NewConfig(
 
 ### Environment Defaults
 
-- **Local**: Debug log level, stdout output, no OTLP endpoint required
+- **Local**: Debug log level, pretty colorized output, no OTLP endpoint required
 - **Dev/Prod**: Info log level, OTLP output, endpoint required
 
 ### Manual Configuration
@@ -262,7 +263,7 @@ The `Init()` function automatically chooses the appropriate exporters based on y
 
 ### Local Development (`EnvLocal`)
 
-- **Logging**: stdout with pretty formatting
+- **Logging**: pretty colorized handler with human-readable format
 - **Tracing**: stdout with pretty formatting
 - **Metrics**: completely disabled (no overhead)
 
@@ -275,7 +276,7 @@ The `Init()` function automatically chooses the appropriate exporters based on y
 ### Configuration Examples
 
 ```go
-// Local development - uses stdout, metrics always disabled
+// Local development - uses pretty logging, metrics always disabled
 cfg := observability.Config{
 	Env:            observability.EnvLocal,
 	ServiceName:    "my-service",

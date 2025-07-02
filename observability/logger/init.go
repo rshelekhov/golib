@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
@@ -26,6 +27,22 @@ type Config struct {
 
 // Init initializes OpenTelemetry LoggerProvider
 func Init(ctx context.Context, cfg Config) (*log.LoggerProvider, *slog.Logger, error) {
+	// For local environment, use pretty handler instead of OTEL
+	if cfg.Env == "local" {
+		handler := NewPrettyHandler(os.Stdout, &PrettyHandlerOptions{
+			Level:     cfg.Level,
+			AddSource: true,
+		})
+
+		finalLogger := slog.New(&levelFilterHandler{
+			handler:  handler,
+			minLevel: cfg.Level,
+		})
+
+		// Return nil LoggerProvider for local env since we're not using OTEL
+		return nil, finalLogger, nil
+	}
+
 	var exporter log.Exporter
 	var err error
 
