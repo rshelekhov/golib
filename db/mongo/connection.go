@@ -51,30 +51,30 @@ func WithTracing(enable bool) ConnectionOption {
 // NewConnection creates a new connection to MongoDB.
 func NewConnection(ctx context.Context, uri string, dbName string, opts ...ConnectionOption) (ConnectionManager, error) {
 	clientOpts := options.Client().ApplyURI(uri)
-	
+
 	// Apply default options
 	connOpts := &connectionOptions{
 		enableTracing: true, // default is true
 	}
-	
+
 	for _, opt := range opts {
 		if opt != nil {
 			opt(connOpts)
 		}
 	}
-	
+
 	// Apply tracing if enabled
 	if connOpts.enableTracing {
 		clientOpts.SetMonitor(otelmongo.NewMonitor())
 	}
-	
+
 	// Apply timeout
 	if connOpts.timeout != nil {
 		clientOpts.SetConnectTimeout(*connOpts.timeout)
 	} else {
 		clientOpts.SetConnectTimeout(DefaultConnectionTimeout)
 	}
-	
+
 	// Apply server API
 	if connOpts.serverAPI != nil {
 		clientOpts.SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1))
@@ -104,12 +104,12 @@ func (c *Connection) Close(ctx context.Context) error {
 }
 
 // Database returns the MongoDB database.
-func (c *Connection) Database() any {
+func (c *Connection) Database() *mongo.Database {
 	return c.database
 }
 
 // Client returns the MongoDB client.
-func (c *Connection) Client() any {
+func (c *Connection) Client() *mongo.Client {
 	return c.client
 }
 

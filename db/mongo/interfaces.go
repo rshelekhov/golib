@@ -18,9 +18,9 @@ type ConnectionCloser interface {
 	// Close closes the connection.
 	Close(ctx context.Context) error
 	// Database returns the database instance.
-	Database() any
+	Database() *mongo.Database
 	// Client returns the client instance.
-	Client() any
+	Client() *mongo.Client
 	// Ping checks the connection to the database.
 	Ping(ctx context.Context) error
 }
