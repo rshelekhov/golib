@@ -1,4 +1,4 @@
-module github.com/rshelekhov/golib/db/postgres
+module github.com/rshelekhov/golib/db/postgres/pgxv5
 
 go 1.24.2
 

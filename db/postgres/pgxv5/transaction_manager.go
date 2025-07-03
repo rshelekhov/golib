@@ -21,10 +21,11 @@ func NewTransactionManager(conn *Connection) *TransactionManager {
 // If a transaction already exists in the context, it will be reused.
 func (m *TransactionManager) runTransaction(ctx context.Context, txOpts pgx.TxOptions, fn func(ctx context.Context) error) (err error) {
 	// If it's nested Transaction, skip initiating a new one and return func(ctx context.Context) error
-	tx, ok := ctx.Value(txKey).(*Transaction)
-	if ok {
+	if _, ok := ctx.Value(txKey).(*Transaction); ok {
 		return fn(ctx)
 	}
+
+	var tx *Transaction
 
 	// Begin runTransaction
 	pgxTx, err := m.conn.BeginTx(ctx, txOpts)
