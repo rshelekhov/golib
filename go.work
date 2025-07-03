@@ -4,6 +4,7 @@ use (
 	./config
 	./db/mongo
 	./db/postgres/pgxv5
+	./db/redis
 	./observability
 	./server
-) 
+)
