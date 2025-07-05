@@ -5,6 +5,7 @@ use (
 	./db/mongo
 	./db/postgres/pgxv5
 	./db/redis
+	./db/s3
 	./observability
 	./server
 )
