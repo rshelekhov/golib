@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -111,6 +112,21 @@ func WithCredentialsChain(enable bool) ConnectionOption {
 	}
 }
 
+// WithMinIOEndpoint is a convenience function for MinIO endpoints.
+// It automatically enables PathStyle and disables SSL if no scheme provided.
+func WithMinIOEndpoint(endpoint string) ConnectionOption {
+	return func(opts *connectionOptions) {
+		opts.endpoint = endpoint
+		opts.forcePathStyle = true
+
+		// Auto-detect if SSL should be disabled for local MinIO
+		if !strings.HasPrefix(endpoint, "https://") &&
+			!strings.HasPrefix(endpoint, "http://") {
+			opts.disableSSL = true
+		}
+	}
+}
+
 // NewConnection creates a new connection to S3.
 func NewConnection(ctx context.Context, opts ...ConnectionOption) (ConnectionAPI, error) {
 	// Apply default options
@@ -143,6 +159,11 @@ func NewConnection(ctx context.Context, opts ...ConnectionOption) (ConnectionAPI
 		cfg = cfg.WithEndpoint(connOpts.endpoint)
 	}
 
+	// Auto-enable PathStyle for MinIO endpoints if not explicitly set
+	if connOpts.endpoint != "" && IsMinIOEndpoint(connOpts.endpoint) && !connOpts.forcePathStyle {
+		connOpts.forcePathStyle = true
+	}
+
 	// Set credentials
 	if !connOpts.credentialsChain && connOpts.accessKey != "" && connOpts.secretKey != "" {
 		cfg = cfg.WithCredentials(credentials.NewStaticCredentials(
@@ -171,6 +192,13 @@ func NewConnection(ctx context.Context, opts ...ConnectionOption) (ConnectionAPI
 	}
 
 	return conn, nil
+}
+
+// IsMinIOEndpoint detects if endpoint looks like MinIO
+func IsMinIOEndpoint(endpoint string) bool {
+	return strings.Contains(endpoint, "minio") ||
+		strings.Contains(endpoint, ":9000") ||
+		strings.Contains(endpoint, ":9001")
 }
 
 // Close closes the connection to S3.

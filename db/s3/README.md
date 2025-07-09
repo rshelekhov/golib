@@ -10,6 +10,7 @@ This library provides a simple and consistent interface for working with AWS S3 
 - **Multipart Uploads**: Support for large file uploads
 - **Presigned URLs**: Generate temporary URLs for secure access
 - **Helper Functions**: Simplified operations for common use cases
+- **MinIO Support**: Enhanced compatibility with automatic configuration detection
 - **OpenTelemetry Integration**: Built-in tracing support
 - **Testing Utilities**: Easy testing with MinIO containers
 
@@ -36,7 +37,7 @@ import (
 func main() {
     ctx := context.Background()
 
-    // Create connection
+    // AWS S3
     conn, err := s3lib.NewConnection(ctx,
         s3lib.WithRegion("us-east-1"),
         s3lib.WithCredentials("your-access-key", "your-secret-key"),
@@ -47,7 +48,18 @@ func main() {
     }
     defer conn.Close()
 
-    // Use the connection...
+    // MinIO (simplified setup)
+    connMinIO, err := s3lib.NewConnection(ctx,
+        s3lib.WithRegion("us-east-1"),
+        s3lib.WithCredentials("minioadmin", "minioadmin"),
+        s3lib.WithMinIOEndpoint("localhost:9000"), // automatically configures for MinIO
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer connMinIO.Close()
+
+    // Use the connections...
 }
 ```
 
@@ -65,6 +77,32 @@ conn, err := s3lib.NewConnection(ctx,
     s3lib.WithTracing(true),
 )
 ```
+
+### MinIO Support
+
+For MinIO endpoints, use the convenient `WithMinIOEndpoint()` function that automatically configures path-style addressing and SSL settings:
+
+```go
+// For MinIO - automatically enables path-style and detects SSL settings
+conn, err := s3lib.NewConnection(ctx,
+    s3lib.WithRegion("us-east-1"),
+    s3lib.WithCredentials("minioadmin", "minioadmin"),
+    s3lib.WithMinIOEndpoint("localhost:9000"), // Auto-disables SSL for local endpoints
+)
+
+// For MinIO with HTTPS
+conn, err := s3lib.NewConnection(ctx,
+    s3lib.WithRegion("us-east-1"),
+    s3lib.WithCredentials("access-key", "secret-key"),
+    s3lib.WithMinIOEndpoint("https://minio.example.com:9000"),
+)
+```
+
+The library automatically detects MinIO endpoints and applies appropriate settings:
+
+- Path-style addressing is automatically enabled
+- SSL is disabled for local endpoints without scheme
+- Common MinIO ports (9000, 9001) are recognized
 
 ### Object Operations
 
