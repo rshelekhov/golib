@@ -65,11 +65,17 @@ func NewApp(ctx context.Context, opts ...Option) (*App, error) {
 
 	healthCheck := health.NewServer()
 
-	// Create gRPC server with interceptors
-	grpcServer := grpc.NewServer(
+	serverOpts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(options.unaryInterceptors...),
 		grpc.ChainStreamInterceptor(options.streamInterceptors...),
-	)
+	}
+	if options.statsHandler != nil {
+		serverOpts = append(serverOpts, grpc.StatsHandler(options.statsHandler))
+	}
+
+	// Create gRPC server with interceptors
+	grpcServer := grpc.NewServer(serverOpts...)
+
 	// Register health check service
 	healthpb.RegisterHealthServer(grpcServer, healthCheck)
 

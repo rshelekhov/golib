@@ -88,6 +88,7 @@ Server bootstrap uses functional options for configuration:
 - `WithMuxOptions(...)` - Add gRPC-Gateway ServeMux options
 - `WithHTTPMiddleware(...)` - Add HTTP middleware
 - `WithLogger(logger *slog.Logger)` - Set the logger
+- `WithStatsHandler(stats.Handler)` - Set a custom gRPC stats handler (e.g., for OpenTelemetry metrics/tracing)
 
 ## Server Modes
 
@@ -102,6 +103,8 @@ The library automatically provides Kubernetes-compatible health endpoints:
 
 - `/healthz` - Liveness probe to check if the service is running
 - `/readyz` - Readiness probe to check if the service is ready to receive traffic
+
+You can extend the `/readyz` endpoint with custom checks by implementing the `ReadinessProvider` interface on your service. Each check will be executed and aggregated into the readiness response.
 
 ## Complete Example
 

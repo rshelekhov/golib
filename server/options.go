@@ -8,6 +8,7 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/stats"
 )
 
 // Options holds all configuration for the application
@@ -23,6 +24,9 @@ type Options struct {
 	streamInterceptors []grpc.StreamServerInterceptor
 	muxOptions         []runtime.ServeMuxOption
 	httpMiddleware     []func(http.Handler) http.Handler
+
+	// Tracing
+	statsHandler stats.Handler
 
 	// Logger
 	logger *slog.Logger
@@ -108,6 +112,13 @@ func WithHTTPMiddleware(middleware ...func(http.Handler) http.Handler) Option {
 func WithLogger(logger *slog.Logger) Option {
 	return func(o *Options) {
 		o.logger = logger
+	}
+}
+
+// WithStatsHandler sets the stats handler
+func WithStatsHandler(statsHandler stats.Handler) Option {
+	return func(o *Options) {
+		o.statsHandler = statsHandler
 	}
 }
 

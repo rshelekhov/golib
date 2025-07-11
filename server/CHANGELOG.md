@@ -5,6 +5,17 @@ All notable changes to the Server Bootstrap package will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2025-07-11
+
+### Added
+
+- `WithStatsHandler()` option to register a gRPC `stats.Handler` for advanced tracing and metrics collection.
+- `ReadinessProvider` interface allowing services to contribute custom readiness checks to the `/readyz` endpoint.
+
+### Changed
+
+- Default README updated to document the new configuration options and readiness extension mechanism.
+
 ## [1.0.0] - 2025-06-25
 
 ### Added
