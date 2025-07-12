@@ -5,6 +5,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -58,4 +59,15 @@ func OutgoingSpan(ctx context.Context, name string, spanKind SpanKind, attrs ...
 		trace.WithSpanKind(spanKind),
 		trace.WithAttributes(attrs...),
 	)
+}
+
+// RecordError records the provided error on the span and sets the span status to codes.Error.
+// It is safe to call with nil span or error.
+func RecordError(span trace.Span, err error) {
+	if span == nil || err == nil {
+		return
+	}
+
+	span.RecordError(err)
+	span.SetStatus(codes.Error, err.Error())
 }

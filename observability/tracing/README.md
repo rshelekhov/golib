@@ -193,6 +193,17 @@ span.SetAttributes(
 )
 ```
 
+## Recording errors
+
+`RecordError(span, err)` wraps `span.RecordError` and sets the span status to `codes.Error` in one call, reducing boilerplate:
+
+```go
+if err != nil {
+    tracing.RecordError(span, err)
+    return err
+}
+```
+
 ## Export to OTLP (Jaeger, Tempo, ...)
 
 ### Examples of endpoints:
