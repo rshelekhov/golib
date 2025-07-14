@@ -51,6 +51,7 @@ func Init(ctx context.Context, cfg Config) (*Observability, error) {
 	if useOTLP {
 		tracingCfg.ExporterType = tracing.ExporterOTLP
 		tracingCfg.OTLPEndpoint = cfg.OTLPEndpoint
+		tracingCfg.OTLPTransportType = cfg.OTLPTransportType
 	} else {
 		tracingCfg.ExporterType = tracing.ExporterStdout
 	}

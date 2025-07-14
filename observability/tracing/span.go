@@ -71,3 +71,15 @@ func RecordError(span trace.Span, err error) {
 	span.RecordError(err)
 	span.SetStatus(codes.Error, err.Error())
 }
+
+// EndSpanOnError records the error on the span and ends the span.
+// It is safe to call with nil span or error pointer.
+func EndSpanOnError(span trace.Span, errPtr *error) {
+	if span == nil {
+		return
+	}
+	if errPtr != nil && *errPtr != nil {
+		RecordError(span, *errPtr)
+	}
+	span.End()
+}

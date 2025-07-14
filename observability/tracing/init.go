@@ -6,6 +6,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -22,12 +23,20 @@ const (
 	ExporterOTLP   ExporterType = "otlp"
 )
 
+type OTLPTransportType string
+
+const (
+	OTLPGRPC OTLPTransportType = "grpc"
+	OTLPHTTP OTLPTransportType = "http"
+)
+
 type Config struct {
-	ServiceName    string
-	ServiceVersion string
-	Env            string
-	ExporterType   ExporterType
-	OTLPEndpoint   string // Used only when ExporterType is ExporterOTLP
+	ServiceName       string
+	ServiceVersion    string
+	Env               string
+	ExporterType      ExporterType
+	OTLPEndpoint      string            // Used only when ExporterType is ExporterOTLP
+	OTLPTransportType OTLPTransportType // "grpc" or "http", used only when ExporterType is ExporterOTLP
 }
 
 // Init initializes OpenTelemetry TracerProvider
@@ -37,14 +46,26 @@ func Init(ctx context.Context, cfg Config) (*sdktrace.TracerProvider, error) {
 
 	switch cfg.ExporterType {
 	case ExporterOTLP:
-		exporter, err = otlptracegrpc.New(ctx,
-			otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
-			otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("create otlp exporter: %w", err)
+		switch cfg.OTLPTransportType {
+		case OTLPHTTP:
+			exporter, err = otlptracehttp.New(ctx,
+				otlptracehttp.WithEndpoint(cfg.OTLPEndpoint),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("create otlp http exporter: %w", err)
+			}
+		case OTLPGRPC:
+			exporter, err = otlptracegrpc.New(ctx,
+				otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
+				otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("create otlp grpc exporter: %w", err)
+			}
+		default:
+			return nil, fmt.Errorf("invalid otlp transport type: %s", cfg.OTLPTransportType)
 		}
-	default: // ExporterStdout or empty
+	default:
 		exporter, err = stdouttrace.New(stdouttrace.WithPrettyPrint())
 		if err != nil {
 			return nil, fmt.Errorf("create stdout exporter: %w", err)

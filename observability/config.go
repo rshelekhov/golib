@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+
+	"github.com/rshelekhov/golib/observability/tracing"
 )
 
 const (
@@ -18,21 +20,28 @@ var supportedEnvs = map[string]struct{}{
 	EnvProd:  {},
 }
 
+var supportedOTLPTransportTypes = map[tracing.OTLPTransportType]struct{}{
+	tracing.OTLPGRPC: {},
+	tracing.OTLPHTTP: {},
+}
+
 type Config struct {
-	Env            string
-	ServiceName    string
-	ServiceVersion string
-	EnableMetrics  bool
-	OTLPEndpoint   string
-	LogLevel       slog.Level
+	Env               string
+	ServiceName       string
+	ServiceVersion    string
+	EnableMetrics     bool
+	OTLPEndpoint      string
+	OTLPTransportType tracing.OTLPTransportType
+	LogLevel          slog.Level
 }
 
 type ConfigParams struct {
-	Env            string
-	ServiceName    string
-	ServiceVersion string
-	EnableMetrics  bool
-	OTLPEndpoint   string
+	Env               string
+	ServiceName       string
+	ServiceVersion    string
+	EnableMetrics     bool
+	OTLPEndpoint      string
+	OTLPTransportType tracing.OTLPTransportType
 }
 
 func (c ConfigParams) Validate() error {
@@ -53,6 +62,14 @@ func (c ConfigParams) Validate() error {
 	if c.requiresOTLPEndpoint() && c.OTLPEndpoint == "" {
 		errMessages = append(errMessages, fmt.Sprintf("OTLP endpoint is required for environment %s", c.Env))
 	}
+	if c.requiresOTLPEndpoint() && c.OTLPTransportType == "" {
+		errMessages = append(errMessages, "OTLP transport type is required for environment %s", c.Env)
+	}
+	if _, ok := supportedOTLPTransportTypes[c.OTLPTransportType]; !ok {
+		errMessages = append(errMessages, fmt.Sprintf("unsupported OTLP transport type: %s (supported: %s)", c.OTLPTransportType, strings.Join(getSupportedOTLPTransportTypes(), ", ")))
+		return fmt.Errorf("%s", strings.Join(errMessages, "; "))
+	}
+
 	if len(errMessages) > 0 {
 		return fmt.Errorf("%s", strings.Join(errMessages, "; "))
 	}
@@ -69,6 +86,14 @@ func getSupportedEnvs() []string {
 		envs = append(envs, env)
 	}
 	return envs
+}
+
+func getSupportedOTLPTransportTypes() []string {
+	types := make([]string, 0, len(supportedOTLPTransportTypes))
+	for t := range supportedOTLPTransportTypes {
+		types = append(types, string(t))
+	}
+	return types
 }
 
 func getDefaultLogLevel(env string) slog.Level {
@@ -97,12 +122,13 @@ func NewConfig(params ConfigParams, opts ...Option) (Config, error) {
 	}
 
 	cfg := Config{
-		Env:            params.Env,
-		ServiceName:    params.ServiceName,
-		ServiceVersion: params.ServiceVersion,
-		EnableMetrics:  params.EnableMetrics,
-		OTLPEndpoint:   params.OTLPEndpoint,
-		LogLevel:       getDefaultLogLevel(params.Env),
+		Env:               params.Env,
+		ServiceName:       params.ServiceName,
+		ServiceVersion:    params.ServiceVersion,
+		EnableMetrics:     params.EnableMetrics,
+		OTLPEndpoint:      params.OTLPEndpoint,
+		OTLPTransportType: params.OTLPTransportType,
+		LogLevel:          getDefaultLogLevel(params.Env),
 	}
 
 	// Apply options
