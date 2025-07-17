@@ -37,11 +37,13 @@ func main() {
 
 ```go
 type Config struct {
-    ServiceName    string
-    ServiceVersion string
-    Env            string
-    ExporterType   ExporterType
-    OTLPEndpoint   string // Used only when ExporterType is ExporterOTLP
+    ServiceName       string
+    ServiceVersion    string
+    Env               string
+    ExporterType      ExporterType
+    OTLPEndpoint      string            // Used only when ExporterType is ExporterOTLP
+    OTLPTransportType OTLPTransportType // "grpc" or "http", used only when ExporterType is ExporterOTLP
+    OTLPInsecure      bool              // If true, uses insecure OTLP connection
 }
 
 type ExporterType string
@@ -49,6 +51,13 @@ type ExporterType string
 const (
     ExporterStdout ExporterType = "stdout"
     ExporterOTLP   ExporterType = "otlp"
+)
+
+type OTLPTransportType string
+
+const (
+    OTLPGRPC OTLPTransportType = "grpc"
+    OTLPHTTP OTLPTransportType = "http"
 )
 ```
 
@@ -89,18 +98,20 @@ defer tracerProvider.Shutdown(ctx)
 ### OTLP (Production)
 
 ```go
-// OTLP exporter for production
+// OTLP exporter for production with TLS (default)
 cfg := tracing.Config{
-    ServiceName:    "my-service",
-    ServiceVersion: "1.0.0",
-    Env:            "production",
-    ExporterType:   tracing.ExporterOTLP,
-    OTLPEndpoint:   "localhost:4317",
+    ServiceName:       "my-service",
+    ServiceVersion:    "1.0.0",
+    Env:               "production",
+    ExporterType:      tracing.ExporterOTLP,
+    OTLPEndpoint:      "otel-collector.company.com:4317",
+    OTLPTransportType: tracing.OTLPGRPC,
+    OTLPInsecure:      false, // Uses TLS (recommended for production)
 }
 tracerProvider, err := tracing.Init(ctx, cfg)
 defer tracerProvider.Shutdown(ctx)
 
-// Traces sent to OTLP collector (Jaeger, Tempo, etc.)
+// Traces sent to OTLP collector (Jaeger, Tempo, etc.) using TLS
 ```
 
 ## What's Configured Automatically
@@ -204,6 +215,59 @@ if err != nil {
 }
 ```
 
+## TLS Configuration
+
+The tracing package supports configurable TLS for OTLP connections with smart defaults:
+
+### Default TLS Behavior
+
+- **Production environments**: Secure connections (TLS) by default
+- **Development environments**: Can use either secure or insecure connections
+
+### TLS Configuration Examples
+
+```go
+// Production with TLS (recommended)
+cfg := tracing.Config{
+    ServiceName:       "my-service",
+    ServiceVersion:    "1.0.0",
+    Env:               "production",
+    ExporterType:      tracing.ExporterOTLP,
+    OTLPEndpoint:      "otel-collector.company.com:4317",
+    OTLPTransportType: tracing.OTLPGRPC,
+    OTLPInsecure:      false, // Uses TLS
+}
+
+// Development with insecure connection (local OTLP collector)
+cfg := tracing.Config{
+    ServiceName:       "my-service",
+    ServiceVersion:    "1.0.0",
+    Env:               "development",
+    ExporterType:      tracing.ExporterOTLP,
+    OTLPEndpoint:      "localhost:4317",
+    OTLPTransportType: tracing.OTLPGRPC,
+    OTLPInsecure:      true, // No TLS for local development
+}
+
+// HTTP transport with TLS
+cfg := tracing.Config{
+    ServiceName:       "my-service",
+    ServiceVersion:    "1.0.0",
+    Env:               "production",
+    ExporterType:      tracing.ExporterOTLP,
+    OTLPEndpoint:      "https://otel-collector.company.com:4318",
+    OTLPTransportType: tracing.OTLPHTTP,
+    OTLPInsecure:      false, // Uses TLS
+}
+```
+
+### Transport Types
+
+Both transport types support TLS configuration:
+
+- **GRPC Transport** (`tracing.OTLPGRPC`): Uses gRPC with configurable TLS
+- **HTTP Transport** (`tracing.OTLPHTTP`): Uses HTTP with configurable TLS
+
 ## Export to OTLP (Jaeger, Tempo, ...)
 
 ### Examples of endpoints:
@@ -213,17 +277,31 @@ if err != nil {
 - **OTEL Collector:** `localhost:4317` (gRPC)
 
 ```go
-// For production
+// Production with TLS (recommended)
 cfg := tracing.Config{
-    ServiceName:    "my-service",
-    ServiceVersion: "1.0.0",
-    Env:            "production",
-    ExporterType:   tracing.ExporterOTLP,
-    OTLPEndpoint:   "localhost:4317",
+    ServiceName:       "my-service",
+    ServiceVersion:    "1.0.0",
+    Env:               "production",
+    ExporterType:      tracing.ExporterOTLP,
+    OTLPEndpoint:      "otel-collector.company.com:4317",
+    OTLPTransportType: tracing.OTLPGRPC,
+    OTLPInsecure:      false, // Uses TLS
 }
 tracerProvider, err := tracing.Init(ctx, cfg)
 
-// For development
+// Development with local collector (insecure)
+cfg = tracing.Config{
+    ServiceName:       "my-service",
+    ServiceVersion:    "1.0.0",
+    Env:               "development",
+    ExporterType:      tracing.ExporterOTLP,
+    OTLPEndpoint:      "localhost:4317",
+    OTLPTransportType: tracing.OTLPGRPC,
+    OTLPInsecure:      true, // No TLS for local development
+}
+tracerProvider, err = tracing.Init(ctx, cfg)
+
+// Development with stdout (no OTLP)
 cfg = tracing.Config{
     ServiceName:    "my-service",
     ServiceVersion: "1.0.0",

@@ -23,6 +23,7 @@ type Config struct {
 	Env            string
 	Level          slog.Level
 	Endpoint       string // OTLP endpoint. If empty, stdout exporter is used.
+	OTLPInsecure   bool   // If true, uses insecure OTLP connection
 }
 
 // Init initializes OpenTelemetry LoggerProvider
@@ -53,11 +54,15 @@ func Init(ctx context.Context, cfg Config) (*log.LoggerProvider, *slog.Logger, e
 			return nil, nil, fmt.Errorf("failed to create stdout log exporter: %w", err)
 		}
 	} else {
-		// Create OTLP exporter
-		exporter, err = otlploggrpc.New(ctx,
+		// Create OTLP exporter with configurable TLS
+		opts := []otlploggrpc.Option{
 			otlploggrpc.WithEndpoint(cfg.Endpoint),
-			otlploggrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-		)
+		}
+		if cfg.OTLPInsecure {
+			opts = append(opts, otlploggrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
+		}
+
+		exporter, err = otlploggrpc.New(ctx, opts...)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to create otlp log exporter: %w", err)
 		}

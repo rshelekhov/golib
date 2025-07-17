@@ -127,19 +127,20 @@ func main() {
 }
 ```
 
-### Production (OTLP)
+### Production (OTLP with TLS)
 
 ```go
 func main() {
     ctx := context.Background()
 
-    // Initialize logger with OTLP and info level for production
+    // Initialize logger with OTLP and info level for production (TLS by default)
     cfg := logger.Config{
         ServiceName:    "my-service",
         ServiceVersion: "1.0.0",
         Env:            "production",
         Level:          slog.LevelInfo,
-        Endpoint:       "localhost:4317", // OTLP endpoint
+        Endpoint:       "otel-collector.company.com:4317", // OTLP endpoint
+        OTLPInsecure:   false, // Uses TLS (recommended for production)
     }
     loggerProvider, otelLogger, err := logger.Init(ctx, cfg)
     if err != nil {
@@ -149,11 +150,13 @@ func main() {
 
     // Initialize tracing with OTLP
     tracingCfg := tracing.Config{
-        ServiceName:    "my-service",
-        ServiceVersion: "1.0.0",
-        Env:            "production",
-        ExporterType:   tracing.ExporterOTLP,
-        OTLPEndpoint:   "localhost:4317",
+        ServiceName:       "my-service",
+        ServiceVersion:    "1.0.0",
+        Env:               "production",
+        ExporterType:      tracing.ExporterOTLP,
+        OTLPEndpoint:      "otel-collector.company.com:4317",
+        OTLPTransportType: tracing.OTLPGRPC,
+        OTLPInsecure:      false, // Uses TLS (recommended for production)
     }
     tracerProvider, err := tracing.Init(ctx, tracingCfg)
     if err != nil {
@@ -168,7 +171,55 @@ func main() {
 
     // Debug logs won't be shown (info level)
     otelLogger.DebugContext(ctx, "this won't be logged")
-    otelLogger.InfoContext(ctx, "OTLP processing", "user_id", "456")
+    otelLogger.InfoContext(ctx, "OTLP processing with TLS", "user_id", "456")
+}
+```
+
+### Development (OTLP without TLS)
+
+```go
+func main() {
+    ctx := context.Background()
+
+    // Initialize logger with OTLP for development (insecure connection)
+    cfg := logger.Config{
+        ServiceName:    "my-service",
+        ServiceVersion: "1.0.0",
+        Env:            "development",
+        Level:          slog.LevelDebug,
+        Endpoint:       "localhost:4317", // Local OTLP collector
+        OTLPInsecure:   true, // No TLS for local development
+    }
+    loggerProvider, otelLogger, err := logger.Init(ctx, cfg)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer loggerProvider.Shutdown(context.Background())
+
+    // Initialize tracing with OTLP (insecure)
+    tracingCfg := tracing.Config{
+        ServiceName:       "my-service",
+        ServiceVersion:    "1.0.0",
+        Env:               "development",
+        ExporterType:      tracing.ExporterOTLP,
+        OTLPEndpoint:      "localhost:4317",
+        OTLPTransportType: tracing.OTLPGRPC,
+        OTLPInsecure:      true, // No TLS for local development
+    }
+    tracerProvider, err := tracing.Init(ctx, tracingCfg)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer tracerProvider.Shutdown(context.Background())
+
+    // Use logger with automatic correlation
+    tracer := tracerProvider.Tracer("example")
+    ctx, span := tracer.Start(ctx, "operation")
+    defer span.End()
+
+    // Debug logs will be shown (debug level)
+    otelLogger.DebugContext(ctx, "debug information", "user_id", "789")
+    otelLogger.InfoContext(ctx, "local OTLP processing without TLS", "user_id", "789")
 }
 ```
 
@@ -206,6 +257,7 @@ type Config struct {
     Env            string
     Level          slog.Level
     Endpoint       string // OTLP endpoint. If empty, stdout exporter is used.
+    OTLPInsecure   bool   // If true, uses insecure OTLP connection
 }
 ```
 
@@ -250,6 +302,49 @@ logger.InfoContext(ctx, "message", "key", "value")          // Level 0
 logger.WarnContext(ctx, "warning", "field", "value")        // Level 4
 logger.ErrorContext(ctx, "error", "error", err)             // Level 8
 ```
+
+## TLS Configuration
+
+The logger package supports configurable TLS for OTLP connections:
+
+### TLS Configuration Examples
+
+```go
+// Production with TLS (recommended)
+cfg := logger.Config{
+    ServiceName:    "my-service",
+    ServiceVersion: "1.0.0",
+    Env:            "production",
+    Level:          slog.LevelInfo,
+    Endpoint:       "otel-collector.company.com:4317",
+    OTLPInsecure:   false, // Uses TLS (recommended for production)
+}
+
+// Development with insecure connection (local OTLP collector)
+cfg := logger.Config{
+    ServiceName:    "my-service",
+    ServiceVersion: "1.0.0",
+    Env:            "development",
+    Level:          slog.LevelDebug,
+    Endpoint:       "localhost:4317",
+    OTLPInsecure:   true, // No TLS for local development
+}
+
+// Local development (TLS not applicable - uses pretty handler)
+cfg := logger.Config{
+    ServiceName:    "my-service",
+    ServiceVersion: "1.0.0",
+    Env:            "local",
+    Level:          slog.LevelDebug,
+    // Endpoint and OTLPInsecure not used for local env
+}
+```
+
+### TLS Best Practices
+
+- **Production**: Always use TLS (`OTLPInsecure: false`) for secure log transmission
+- **Development**: Use insecure connections (`OTLPInsecure: true`) for local OTLP collectors
+- **Local**: TLS configuration is not applicable (uses pretty handler, no network calls)
 
 ## Key Benefits
 

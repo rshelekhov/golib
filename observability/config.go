@@ -26,13 +26,19 @@ var supportedOTLPTransportTypes = map[tracing.OTLPTransportType]struct{}{
 }
 
 type Config struct {
-	Env               string
-	ServiceName       string
-	ServiceVersion    string
-	EnableMetrics     bool
-	OTLPEndpoint      string
+	Env            string
+	ServiceName    string
+	ServiceVersion string
+	EnableMetrics  bool
+	OTLPEndpoint   string
+	// TODO: change to string
 	OTLPTransportType tracing.OTLPTransportType
 	LogLevel          slog.Level
+
+	// TLS configuration for OTLP exporters
+	// If true, uses TLS (default for production)
+	// If false, uses insecure connection (useful for local development)
+	OTLPInsecure bool
 }
 
 type ConfigParams struct {
@@ -42,6 +48,7 @@ type ConfigParams struct {
 	EnableMetrics     bool
 	OTLPEndpoint      string
 	OTLPTransportType tracing.OTLPTransportType
+	OTLPInsecure      *bool // Use pointer to distinguish between "not set" and "explicitly false"
 }
 
 func (c ConfigParams) Validate() error {
@@ -105,6 +112,15 @@ func getDefaultLogLevel(env string) slog.Level {
 	}
 }
 
+func getDefaultOTLPInsecure(env string) bool {
+	switch env {
+	case EnvLocal, EnvDev:
+		return true // Use insecure connections for local/dev
+	default:
+		return false // Use TLS for production
+	}
+}
+
 // Option defines a functional option for Config
 type Option func(*Config)
 
@@ -112,6 +128,13 @@ type Option func(*Config)
 func WithLogLevel(level slog.Level) Option {
 	return func(cfg *Config) {
 		cfg.LogLevel = level
+	}
+}
+
+// WithOTLPInsecure sets whether to use insecure OTLP connections
+func WithOTLPInsecure(insecure bool) Option {
+	return func(cfg *Config) {
+		cfg.OTLPInsecure = insecure
 	}
 }
 
@@ -129,6 +152,12 @@ func NewConfig(params ConfigParams, opts ...Option) (Config, error) {
 		OTLPEndpoint:      params.OTLPEndpoint,
 		OTLPTransportType: params.OTLPTransportType,
 		LogLevel:          getDefaultLogLevel(params.Env),
+		OTLPInsecure:      getDefaultOTLPInsecure(params.Env),
+	}
+
+	// If user explicitly set OTLPInsecure in params, use that instead of default
+	if params.OTLPInsecure != nil {
+		cfg.OTLPInsecure = *params.OTLPInsecure
 	}
 
 	// Apply options

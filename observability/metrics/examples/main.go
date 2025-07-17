@@ -43,13 +43,14 @@ func ExampleInitMeter() {
 func ExampleInitMeterOTLP() {
 	ctx := context.Background()
 
-	// OTLP exporter for push model
+	// OTLP exporter for push model (production with TLS by default)
 	cfg := metrics.Config{
 		ServiceName:    "my-service",
 		ServiceVersion: "1.0.0",
 		Env:            "production",
 		ExporterType:   metrics.ExporterOTLP,
-		OTLPEndpoint:   "localhost:4317",
+		OTLPEndpoint:   "otel-collector.company.com:4317",
+		OTLPInsecure:   false, // Uses TLS (default for production)
 	}
 	meterProvider, _, err := metrics.Init(ctx, cfg)
 	if err != nil {
@@ -62,10 +63,39 @@ func ExampleInitMeterOTLP() {
 	}()
 
 	meter := metrics.OtelMeter()
-	counter, _ := meter.Int64Counter("my_otlp_counter")
+	counter, _ := meter.Int64Counter("my_otlp_counter", metric.WithDescription("Production counter with TLS"))
 	counter.Add(context.Background(), 1)
 
-	fmt.Println("Metrics pushed to OTLP collector")
+	fmt.Println("Metrics pushed to OTLP collector using TLS")
+}
+
+func ExampleInitMeterOTLPInsecure() {
+	ctx := context.Background()
+
+	// OTLP exporter for local development (insecure connection)
+	cfg := metrics.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		ExporterType:   metrics.ExporterOTLP,
+		OTLPEndpoint:   "localhost:4317",
+		OTLPInsecure:   true, // Uses insecure connection (default for dev)
+	}
+	meterProvider, _, err := metrics.Init(ctx, cfg)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := meterProvider.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down: %v", err)
+		}
+	}()
+
+	meter := metrics.OtelMeter()
+	counter, _ := meter.Int64Counter("my_dev_counter", metric.WithDescription("Development counter without TLS"))
+	counter.Add(context.Background(), 1)
+
+	fmt.Println("Metrics pushed to local OTLP collector without TLS")
 }
 
 // Note: Stdout exporter for metrics has been removed as it's not practical
@@ -82,5 +112,6 @@ func ExampleGRPCServer() {
 func main() {
 	ExampleInitMeter()
 	ExampleInitMeterOTLP()
+	ExampleInitMeterOTLPInsecure()
 	ExampleGRPCServer()
 }

@@ -30,6 +30,7 @@ type Config struct {
 	ExporterType   ExporterType
 	OTLPEndpoint   string        // Used only when ExporterType is ExporterOTLP
 	PushInterval   time.Duration // Used for OTLP exporter, defaults to 30s
+	OTLPInsecure   bool          // If true, uses insecure OTLP connection
 }
 
 // Init initializes OpenTelemetry MeterProvider with the specified exporter
@@ -48,7 +49,7 @@ func Init(ctx context.Context, cfg Config) (*sdkmetric.MeterProvider, http.Handl
 
 	switch cfg.ExporterType {
 	case ExporterOTLP:
-		provider, err = initOTLP(ctx, res, cfg.OTLPEndpoint, cfg.PushInterval)
+		provider, err = initOTLP(ctx, res, cfg.OTLPEndpoint, cfg.PushInterval, cfg.OTLPInsecure)
 	default: // ExporterPrometheus or empty
 		provider, handler, err = initPrometheus(res)
 	}
@@ -85,12 +86,16 @@ func initPrometheus(res *resource.Resource) (*sdkmetric.MeterProvider, http.Hand
 	return provider, handler, nil
 }
 
-func initOTLP(ctx context.Context, res *resource.Resource, endpoint string, interval time.Duration) (*sdkmetric.MeterProvider, error) {
-	// Create OTLP exporter
-	exporter, err := otlpmetricgrpc.New(ctx,
+func initOTLP(ctx context.Context, res *resource.Resource, endpoint string, interval time.Duration, insecure bool) (*sdkmetric.MeterProvider, error) {
+	// Create OTLP exporter with configurable TLS
+	opts := []otlpmetricgrpc.Option{
 		otlpmetricgrpc.WithEndpoint(endpoint),
-		otlpmetricgrpc.WithInsecure(),
-	)
+	}
+	if insecure {
+		opts = append(opts, otlpmetricgrpc.WithInsecure())
+	}
+
+	exporter, err := otlpmetricgrpc.New(ctx, opts...)
 	if err != nil {
 		return nil, err
 	}

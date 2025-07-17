@@ -36,17 +36,19 @@ func ExampleInitTracer() {
 	// ... your application logic
 }
 
-// Example of tracing initialization (OTLP)
+// Example of tracing initialization (OTLP with TLS)
 func ExampleInitTracerOTLP() {
 	ctx := context.Background()
 
-	// OTLP exporter for production
+	// OTLP exporter for production (with TLS by default)
 	cfg := tracing.Config{
-		ServiceName:    "my-service",
-		ServiceVersion: "1.0.0",
-		Env:            "production",
-		ExporterType:   tracing.ExporterOTLP,
-		OTLPEndpoint:   "localhost:4317",
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.0.0",
+		Env:               "production",
+		ExporterType:      tracing.ExporterOTLP,
+		OTLPEndpoint:      "otel-collector.company.com:4317",
+		OTLPTransportType: tracing.OTLPGRPC,
+		OTLPInsecure:      false, // Uses TLS (default for production)
 	}
 	tracerProvider, err := tracing.Init(ctx, cfg)
 	if err != nil {
@@ -58,7 +60,63 @@ func ExampleInitTracerOTLP() {
 		}
 	}()
 
-	fmt.Println("Tracer initialized with OTLP exporter")
+	fmt.Println("Tracer initialized with OTLP exporter using TLS")
+	// ... your application logic
+}
+
+// Example of tracing initialization (OTLP without TLS for development)
+func ExampleInitTracerOTLPInsecure() {
+	ctx := context.Background()
+
+	// OTLP exporter for development (insecure connection)
+	cfg := tracing.Config{
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.0.0",
+		Env:               "development",
+		ExporterType:      tracing.ExporterOTLP,
+		OTLPEndpoint:      "localhost:4317",
+		OTLPTransportType: tracing.OTLPGRPC,
+		OTLPInsecure:      true, // Uses insecure connection (default for dev)
+	}
+	tracerProvider, err := tracing.Init(ctx, cfg)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down tracer: %v", err)
+		}
+	}()
+
+	fmt.Println("Tracer initialized with OTLP exporter without TLS (development)")
+	// ... your application logic
+}
+
+// Example of tracing initialization (OTLP HTTP transport with TLS)
+func ExampleInitTracerOTLPHTTP() {
+	ctx := context.Background()
+
+	// OTLP HTTP exporter for production (with TLS)
+	cfg := tracing.Config{
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.0.0",
+		Env:               "production",
+		ExporterType:      tracing.ExporterOTLP,
+		OTLPEndpoint:      "https://otel-collector.company.com:4318",
+		OTLPTransportType: tracing.OTLPHTTP,
+		OTLPInsecure:      false, // Uses TLS (default for production)
+	}
+	tracerProvider, err := tracing.Init(ctx, cfg)
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down tracer: %v", err)
+		}
+	}()
+
+	fmt.Println("Tracer initialized with OTLP HTTP exporter using TLS")
 	// ... your application logic
 }
 
@@ -170,6 +228,8 @@ func main() {
 
 	// ExampleInitTracer()
 	// ExampleInitTracerOTLP()
+	// ExampleInitTracerOTLPInsecure()
+	// ExampleInitTracerOTLPHTTP()
 	// ExampleHTTPMiddleware()
 	// ExampleGRPCStatsHandler()
 

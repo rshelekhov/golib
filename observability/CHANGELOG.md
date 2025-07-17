@@ -5,6 +5,31 @@ All notable changes to the Observability package will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2025-07-15
+
+### Added
+
+- **Configurable TLS Support**: Added `OTLPInsecure` configuration option for OTLP exporters
+  - Smart environment-based defaults: insecure for local/dev, secure for production
+  - Functional option `WithOTLPInsecure(bool)` to override defaults
+  - Support for both GRPC and HTTP OTLP transports
+  - Applies to all observability components: logging, tracing, and metrics
+- **TLS Configuration Examples**: Added comprehensive examples in `examples/tls_example.go`
+- **Enhanced Documentation**: Updated README with detailed TLS configuration guide
+
+### Changed
+
+- **OTLP Exporters**: All OTLP exporters now respect the `OTLPInsecure` configuration
+  - Logger: `otlploggrpc` exporter uses configurable TLS
+  - Tracing: Both `otlptracegrpc` and `otlptracehttp` exporters use configurable TLS
+  - Metrics: `otlpmetricgrpc` exporter uses configurable TLS
+- **Config Structure**: Added `OTLPInsecure` field to main `Config` and all component configs
+
+### Fixed
+
+- **TLS Consistency**: Resolved hardcoded insecure connections across all OTLP exporters
+- **Production Security**: Production environments now use TLS by default for OTLP connections
+
 ## [1.3.5] - 2025-07-13
 
 ### Added

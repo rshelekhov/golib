@@ -67,6 +67,7 @@ type Config struct {
 	ExporterType   ExporterType
 	OTLPEndpoint   string        // Used only when ExporterType is ExporterOTLP
 	PushInterval   time.Duration // Used for OTLP exporter, defaults to 30s
+	OTLPInsecure   bool          // If true, uses insecure OTLP connection
 }
 
 type ExporterType string
@@ -116,19 +117,57 @@ http.Handle("/metrics", handler)
 ### OTLP (Push Model)
 
 ```go
-// For Grafana Cloud, Tempo, or OTLP collector
+// For production with TLS (recommended)
 cfg := metrics.Config{
 	ServiceName:    "my-service",
 	ServiceVersion: "1.0.0",
 	Env:            "production",
 	ExporterType:   metrics.ExporterOTLP,
-	OTLPEndpoint:   "localhost:4317",
+	OTLPEndpoint:   "otel-collector.company.com:4317",
 	PushInterval:   30 * time.Second, // Optional, defaults to 30s
+	OTLPInsecure:   false, // Uses TLS (recommended for production)
 }
 meterProvider, _, err := metrics.Init(ctx, cfg)
 defer meterProvider.Shutdown(ctx)
 
-// Metrics automatically pushed every 30 seconds
+// Metrics automatically pushed every 30 seconds using TLS
+```
+
+## TLS Configuration
+
+The metrics package supports configurable TLS for OTLP connections:
+
+### TLS Configuration Examples
+
+```go
+// Production with TLS (recommended)
+cfg := metrics.Config{
+	ServiceName:    "my-service",
+	ServiceVersion: "1.0.0",
+	Env:            "production",
+	ExporterType:   metrics.ExporterOTLP,
+	OTLPEndpoint:   "otel-collector.company.com:4317",
+	OTLPInsecure:   false, // Uses TLS
+}
+
+// Development with insecure connection (local OTLP collector)
+cfg := metrics.Config{
+	ServiceName:    "my-service",
+	ServiceVersion: "1.0.0",
+	Env:            "development",
+	ExporterType:   metrics.ExporterOTLP,
+	OTLPEndpoint:   "localhost:4317",
+	OTLPInsecure:   true, // No TLS for local development
+}
+
+// Prometheus exporter (TLS not applicable)
+cfg := metrics.Config{
+	ServiceName:    "my-service",
+	ServiceVersion: "1.0.0",
+	Env:            "production",
+	ExporterType:   metrics.ExporterPrometheus,
+	// OTLPInsecure not used for Prometheus exporter
+}
 ```
 
 ## HTTP metrics

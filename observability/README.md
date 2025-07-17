@@ -7,6 +7,7 @@ Library for logging, tracing and metrics in Go microservices and projects.
 - **Logging** (slog, pretty colorized output for local, trace_id/span_id automatically, configurable log levels)
 - **Tracing** (OpenTelemetry, stdout/OTLP exporters, propagation setup)
 - **Metrics** (OpenTelemetry + Prometheus/OTLP exporters)
+- **Configurable TLS** (secure/insecure OTLP connections with smart environment-based defaults)
 
 ## Quick start
 
@@ -168,6 +169,167 @@ obs, err := observability.Init(context.Background(), cfg)
 ```
 
 See [infrastructure/README.md](infrastructure/README.md) for setup guide, troubleshooting, and production considerations.
+
+## TLS Configuration
+
+The library provides configurable TLS support for OTLP connections with smart environment-based defaults:
+
+### Default TLS Behavior
+
+- **Local/Dev environments**: Insecure connections (no TLS) by default
+- **Production environment**: Secure connections (TLS) by default
+
+### Basic Usage
+
+```go
+// Production with TLS (default)
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:               observability.EnvProd,
+	ServiceName:       "my-service",
+	ServiceVersion:    "1.0.0",
+	EnableMetrics:     true,
+	OTLPEndpoint:      "otel-collector.company.com:4317",
+	OTLPTransportType: tracing.OTLPGRPC,
+	// OTLPInsecure: false (default for production - uses TLS)
+})
+
+// Development with insecure connection (default)
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:               observability.EnvDev,
+	ServiceName:       "my-service",
+	ServiceVersion:    "1.0.0",
+	EnableMetrics:     true,
+	OTLPEndpoint:      "localhost:4317",
+	OTLPTransportType: tracing.OTLPGRPC,
+	// OTLPInsecure: true (default for dev - no TLS)
+})
+```
+
+### Override TLS Settings
+
+Use functional options to override environment defaults:
+
+```go
+// Force TLS in development environment
+cfg, err := observability.NewConfig(
+	observability.ConfigParams{
+		Env:               observability.EnvDev,
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.0.0",
+		EnableMetrics:     true,
+		OTLPEndpoint:      "secure-collector.dev.company.com:4317",
+		OTLPTransportType: tracing.OTLPGRPC,
+	},
+	observability.WithOTLPInsecure(false), // Override to use TLS
+)
+
+// Force insecure in production (not recommended)
+cfg, err := observability.NewConfig(
+	observability.ConfigParams{
+		Env:               observability.EnvProd,
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.0.0",
+		EnableMetrics:     true,
+		OTLPEndpoint:      "localhost:4317",
+		OTLPTransportType: tracing.OTLPGRPC,
+	},
+	observability.WithOTLPInsecure(true), // Override to disable TLS
+)
+```
+
+### Explicit Configuration
+
+You can also set TLS configuration directly in ConfigParams:
+
+```go
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:               observability.EnvProd,
+	ServiceName:       "my-service",
+	ServiceVersion:    "1.0.0",
+	EnableMetrics:     true,
+	OTLPEndpoint:      "localhost:4317",
+	OTLPTransportType: tracing.OTLPGRPC,
+	OTLPInsecure:      &[]bool{true}[0], // Explicitly disable TLS
+})
+```
+
+### TLS Configuration Examples
+
+```go
+// Example 1: Local development with Docker Compose
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:               observability.EnvLocal,
+	ServiceName:       "my-app",
+	ServiceVersion:    "1.0.0",
+	EnableMetrics:     false,
+	OTLPEndpoint:      "", // No OTLP for local
+	// TLS not relevant for local (no OTLP)
+})
+
+// Example 2: Development with local OTLP collector (insecure)
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:               observability.EnvDev,
+	ServiceName:       "my-app",
+	ServiceVersion:    "1.0.0",
+	EnableMetrics:     true,
+	OTLPEndpoint:      "localhost:4317",
+	OTLPTransportType: tracing.OTLPGRPC,
+	// OTLPInsecure: true (default for dev)
+})
+
+// Example 3: Staging with secure OTLP collector
+cfg, err := observability.NewConfig(
+	observability.ConfigParams{
+		Env:               observability.EnvDev, // Using dev env
+		ServiceName:       "my-app",
+		ServiceVersion:    "1.0.0",
+		EnableMetrics:     true,
+		OTLPEndpoint:      "otel-staging.company.com:4317",
+		OTLPTransportType: tracing.OTLPGRPC,
+	},
+	observability.WithOTLPInsecure(false), // Override to use TLS
+)
+
+// Example 4: Production with TLS (default)
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:               observability.EnvProd,
+	ServiceName:       "my-app",
+	ServiceVersion:    "1.0.0",
+	EnableMetrics:     true,
+	OTLPEndpoint:      "otel-prod.company.com:4317",
+	OTLPTransportType: tracing.OTLPGRPC,
+	// OTLPInsecure: false (default for prod - uses TLS)
+})
+```
+
+### Transport Types and TLS
+
+TLS configuration works with both transport types:
+
+- **GRPC Transport** (`tracing.OTLPGRPC`): Uses gRPC with configurable TLS
+- **HTTP Transport** (`tracing.OTLPHTTP`): Uses HTTP with configurable TLS
+
+```go
+// GRPC with TLS
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:               observability.EnvProd,
+	ServiceName:       "my-service",
+	ServiceVersion:    "1.0.0",
+	EnableMetrics:     true,
+	OTLPEndpoint:      "otel-collector.company.com:4317",
+	OTLPTransportType: tracing.OTLPGRPC, // Uses TLS by default in prod
+})
+
+// HTTP with TLS
+cfg, err := observability.NewConfig(observability.ConfigParams{
+	Env:               observability.EnvProd,
+	ServiceName:       "my-service",
+	ServiceVersion:    "1.0.0",
+	EnableMetrics:     true,
+	OTLPEndpoint:      "https://otel-collector.company.com:4318",
+	OTLPTransportType: tracing.OTLPHTTP, // Uses TLS by default in prod
+})
+```
 
 ## Configuration Options
 

@@ -37,6 +37,7 @@ type Config struct {
 	ExporterType      ExporterType
 	OTLPEndpoint      string            // Used only when ExporterType is ExporterOTLP
 	OTLPTransportType OTLPTransportType // "grpc" or "http", used only when ExporterType is ExporterOTLP
+	OTLPInsecure      bool              // If true, uses insecure OTLP connection
 }
 
 // Init initializes OpenTelemetry TracerProvider
@@ -48,17 +49,26 @@ func Init(ctx context.Context, cfg Config) (*sdktrace.TracerProvider, error) {
 	case ExporterOTLP:
 		switch cfg.OTLPTransportType {
 		case OTLPHTTP:
-			exporter, err = otlptracehttp.New(ctx,
+			opts := []otlptracehttp.Option{
 				otlptracehttp.WithEndpoint(cfg.OTLPEndpoint),
-			)
+			}
+			if cfg.OTLPInsecure {
+				opts = append(opts, otlptracehttp.WithInsecure())
+			}
+
+			exporter, err = otlptracehttp.New(ctx, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("create otlp http exporter: %w", err)
 			}
 		case OTLPGRPC:
-			exporter, err = otlptracegrpc.New(ctx,
+			opts := []otlptracegrpc.Option{
 				otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
-				otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())),
-			)
+			}
+			if cfg.OTLPInsecure {
+				opts = append(opts, otlptracegrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
+			}
+
+			exporter, err = otlptracegrpc.New(ctx, opts...)
 			if err != nil {
 				return nil, fmt.Errorf("create otlp grpc exporter: %w", err)
 			}

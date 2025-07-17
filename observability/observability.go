@@ -33,6 +33,7 @@ func Init(ctx context.Context, cfg Config) (*Observability, error) {
 		ServiceVersion: cfg.ServiceVersion,
 		Env:            cfg.Env,
 		Level:          cfg.LogLevel,
+		OTLPInsecure:   cfg.OTLPInsecure,
 	}
 	if useOTLP {
 		loggerCfg.Endpoint = cfg.OTLPEndpoint
@@ -47,6 +48,7 @@ func Init(ctx context.Context, cfg Config) (*Observability, error) {
 		ServiceName:    cfg.ServiceName,
 		ServiceVersion: cfg.ServiceVersion,
 		Env:            cfg.Env,
+		OTLPInsecure:   cfg.OTLPInsecure,
 	}
 	if useOTLP {
 		tracingCfg.ExporterType = tracing.ExporterOTLP
@@ -70,6 +72,7 @@ func Init(ctx context.Context, cfg Config) (*Observability, error) {
 			ServiceName:    cfg.ServiceName,
 			ServiceVersion: cfg.ServiceVersion,
 			Env:            cfg.Env,
+			OTLPInsecure:   cfg.OTLPInsecure,
 		}
 		if useOTLP {
 			metricsCfg.ExporterType = metrics.ExporterOTLP

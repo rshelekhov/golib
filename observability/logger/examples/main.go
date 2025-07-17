@@ -15,10 +15,13 @@ func main() {
 	// Example 1: Stdout logger
 	stdoutExample()
 
-	// Example 2: OTLP logger
+	// Example 2: OTLP logger with TLS (production)
 	// otlpExample()
 
-	// Example 3: Pretty logger for local development
+	// Example 3: OTLP logger without TLS (development)
+	// otlpInsecureExample()
+
+	// Example 4: Pretty logger for local development
 	prettyExample()
 }
 
@@ -76,13 +79,14 @@ func stdoutExample() {
 func otlpExample() {
 	ctx := context.Background()
 
-	// Initialize logger with OTLP exporter
+	// Initialize logger with OTLP exporter (production with TLS by default)
 	loggerCfg := logger.Config{
 		ServiceName:    "my-service",
 		ServiceVersion: "1.0.0",
 		Env:            "production",
 		Level:          slog.LevelInfo,
-		Endpoint:       "localhost:4317",
+		Endpoint:       "otel-collector.company.com:4317",
+		OTLPInsecure:   false, // Uses TLS (default for production)
 	}
 	loggerProvider, otelLogger, err := logger.Init(ctx, loggerCfg)
 	if err != nil {
@@ -96,11 +100,13 @@ func otlpExample() {
 
 	// Initialize tracing with OTLP
 	tracingCfg := tracing.Config{
-		ServiceName:    "my-service",
-		ServiceVersion: "1.0.0",
-		Env:            "production",
-		ExporterType:   tracing.ExporterOTLP,
-		OTLPEndpoint:   "localhost:4317",
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.0.0",
+		Env:               "production",
+		ExporterType:      tracing.ExporterOTLP,
+		OTLPEndpoint:      "otel-collector.company.com:4317",
+		OTLPTransportType: tracing.OTLPGRPC,
+		OTLPInsecure:      false, // Uses TLS (default for production)
 	}
 	tracerProvider, err := tracing.Init(ctx, tracingCfg)
 	if err != nil {
@@ -117,11 +123,66 @@ func otlpExample() {
 	ctx, span := tracer.Start(ctx, "otlp_operation")
 	defer span.End()
 
-	// These logs will be sent to OTLP collector with trace correlation
-	otelLogger.InfoContext(ctx, "OTLP processing started", "user_id", "456")
+	// These logs will be sent to OTLP collector with trace correlation using TLS
+	otelLogger.InfoContext(ctx, "OTLP processing started", "user_id", "456", "tls_enabled", true)
 	otelLogger.ErrorContext(ctx, "OTLP processing failed", "error", "network timeout")
 
-	fmt.Println("Logs and traces sent to OTLP collector!")
+	fmt.Println("Logs and traces sent to OTLP collector using TLS!")
+}
+
+//nolint:unused // Example function
+func otlpInsecureExample() {
+	ctx := context.Background()
+
+	// Initialize logger with OTLP exporter (local development with insecure connection)
+	loggerCfg := logger.Config{
+		ServiceName:    "my-service",
+		ServiceVersion: "1.0.0",
+		Env:            "development",
+		Level:          slog.LevelDebug,
+		Endpoint:       "localhost:4317",
+		OTLPInsecure:   true, // Uses insecure connection (default for dev)
+	}
+	loggerProvider, otelLogger, err := logger.Init(ctx, loggerCfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := loggerProvider.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down logger: %v", err)
+		}
+	}()
+
+	// Initialize tracing with OTLP (insecure)
+	tracingCfg := tracing.Config{
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.0.0",
+		Env:               "development",
+		ExporterType:      tracing.ExporterOTLP,
+		OTLPEndpoint:      "localhost:4317",
+		OTLPTransportType: tracing.OTLPGRPC,
+		OTLPInsecure:      true, // Uses insecure connection (default for dev)
+	}
+	tracerProvider, err := tracing.Init(ctx, tracingCfg)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer func() {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
+			log.Printf("Error shutting down tracer: %v", err)
+		}
+	}()
+
+	// Create a span and log within it
+	tracer := tracerProvider.Tracer("example")
+	ctx, span := tracer.Start(ctx, "otlp_insecure_operation")
+	defer span.End()
+
+	// These logs will be sent to local OTLP collector without TLS
+	otelLogger.InfoContext(ctx, "Local OTLP processing started", "user_id", "789", "tls_enabled", false)
+	otelLogger.WarnContext(ctx, "Using insecure connection", "environment", "development")
+
+	fmt.Println("Logs and traces sent to local OTLP collector without TLS!")
 }
 
 func prettyExample() {
