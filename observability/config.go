@@ -21,17 +21,16 @@ var supportedEnvs = map[string]struct{}{
 }
 
 var supportedOTLPTransportTypes = map[tracing.OTLPTransportType]struct{}{
-	tracing.OTLPGRPC: {},
-	tracing.OTLPHTTP: {},
+	tracing.OTLPTransportGRPC: {},
+	tracing.OTLPTransportHTTP: {},
 }
 
 type Config struct {
-	Env            string
-	ServiceName    string
-	ServiceVersion string
-	EnableMetrics  bool
-	OTLPEndpoint   string
-	// TODO: change to string
+	Env               string
+	ServiceName       string
+	ServiceVersion    string
+	EnableMetrics     bool
+	OTLPEndpoint      string
 	OTLPTransportType tracing.OTLPTransportType
 	LogLevel          slog.Level
 
@@ -47,7 +46,7 @@ type ConfigParams struct {
 	ServiceVersion    string
 	EnableMetrics     bool
 	OTLPEndpoint      string
-	OTLPTransportType tracing.OTLPTransportType
+	OTLPTransportType string
 	OTLPInsecure      *bool // Use pointer to distinguish between "not set" and "explicitly false"
 }
 
@@ -60,6 +59,7 @@ func (c ConfigParams) Validate() error {
 	if c.ServiceVersion == "" {
 		errMessages = append(errMessages, "service version is required")
 	}
+
 	if c.Env == "" {
 		errMessages = append(errMessages, "environment is required")
 	}
@@ -70,17 +70,22 @@ func (c ConfigParams) Validate() error {
 		errMessages = append(errMessages, fmt.Sprintf("OTLP endpoint is required for environment %s", c.Env))
 	}
 	if c.requiresOTLPEndpoint() && c.OTLPTransportType == "" {
-		errMessages = append(errMessages, "OTLP transport type is required for environment %s", c.Env)
+		errMessages = append(errMessages, fmt.Sprintf("OTLP transport type is required for environment %s", c.Env))
 	}
-	if _, ok := supportedOTLPTransportTypes[c.OTLPTransportType]; !ok {
+	if c.OTLPTransportType != "" && !isValidOTLPTransportType(c.OTLPTransportType) {
 		errMessages = append(errMessages, fmt.Sprintf("unsupported OTLP transport type: %s (supported: %s)", c.OTLPTransportType, strings.Join(getSupportedOTLPTransportTypes(), ", ")))
-		return fmt.Errorf("%s", strings.Join(errMessages, "; "))
 	}
 
 	if len(errMessages) > 0 {
 		return fmt.Errorf("%s", strings.Join(errMessages, "; "))
 	}
 	return nil
+}
+
+func isValidOTLPTransportType(transportType string) bool {
+	normalizedType := tracing.OTLPTransportType(strings.ToLower(transportType))
+	_, ok := supportedOTLPTransportTypes[normalizedType]
+	return ok
 }
 
 func (c ConfigParams) requiresOTLPEndpoint() bool {
@@ -150,7 +155,7 @@ func NewConfig(params ConfigParams, opts ...Option) (Config, error) {
 		ServiceVersion:    params.ServiceVersion,
 		EnableMetrics:     params.EnableMetrics,
 		OTLPEndpoint:      params.OTLPEndpoint,
-		OTLPTransportType: params.OTLPTransportType,
+		OTLPTransportType: tracing.OTLPTransportType(params.OTLPTransportType),
 		LogLevel:          getDefaultLogLevel(params.Env),
 		OTLPInsecure:      getDefaultOTLPInsecure(params.Env),
 	}

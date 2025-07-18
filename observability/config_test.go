@@ -2,8 +2,6 @@ package observability
 
 import (
 	"testing"
-
-	"github.com/rshelekhov/golib/observability/tracing"
 )
 
 func TestTLSConfiguration(t *testing.T) {
@@ -59,7 +57,7 @@ func TestTLSConfiguration(t *testing.T) {
 				ServiceVersion:    "1.0.0",
 				EnableMetrics:     true,
 				OTLPEndpoint:      "localhost:4317",
-				OTLPTransportType: tracing.OTLPGRPC,
+				OTLPTransportType: "grpc", // Changed from tracing.OTLPTransportGRPC
 			}
 
 			var opts []Option
@@ -109,7 +107,7 @@ func TestConfigParamsWithExplicitTLS(t *testing.T) {
 		ServiceVersion:    "1.0.0",
 		EnableMetrics:     true,
 		OTLPEndpoint:      "localhost:4317",
-		OTLPTransportType: tracing.OTLPGRPC,
+		OTLPTransportType: "grpc",        // Changed from tracing.OTLPTransportGRPC
 		OTLPInsecure:      &insecureTrue, // explicitly set to insecure
 	}
 
@@ -132,7 +130,7 @@ func TestFunctionalOptionOverride(t *testing.T) {
 		ServiceVersion:    "1.0.0",
 		EnableMetrics:     true,
 		OTLPEndpoint:      "localhost:4317",
-		OTLPTransportType: tracing.OTLPGRPC,
+		OTLPTransportType: "grpc",         // Changed from tracing.OTLPTransportGRPC
 		OTLPInsecure:      &insecureFalse, // explicitly secure
 	}
 

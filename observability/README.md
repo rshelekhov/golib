@@ -68,11 +68,12 @@ func main() {
 func main() {
 	// Production setup with default info logging and OTLP
 	cfg, err := observability.NewConfig(observability.ConfigParams{
-		Env:            observability.EnvProd,
-		ServiceName:    "my-service",
-		ServiceVersion: "1.0.0",
-		EnableMetrics:  true,
-		OTLPEndpoint:   "localhost:4317",
+		Env:               observability.EnvProd,
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.0.0",
+		EnableMetrics:     true,
+		OTLPEndpoint:      "localhost:4317",
+		OTLPTransportType: tracing.OTLPGRPC,
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -125,11 +126,12 @@ if err != nil {
 
 // This will return an error - missing OTLP endpoint for prod
 cfg, err = observability.NewConfig(observability.ConfigParams{
-	Env:            observability.EnvProd,
-	ServiceName:    "my-service",
-	ServiceVersion: "1.0.0",
-	EnableMetrics:  true,
-	OTLPEndpoint:   "", // Missing endpoint
+	Env:               observability.EnvProd,
+	ServiceName:       "my-service",
+	ServiceVersion:    "1.0.0",
+	EnableMetrics:     true,
+	OTLPEndpoint:      "", // Missing endpoint
+	OTLPTransportType: tracing.OTLPGRPC,
 })
 if err != nil {
 	log.Fatal(err) // "OTLP endpoint is required for environment prod"
@@ -156,11 +158,12 @@ Then use OTLP in your application:
 ```go
 // Use OTLP to send all data to the stack
 cfg, err := observability.NewConfig(observability.ConfigParams{
-	Env:            observability.EnvDev,
-	ServiceName:    "my-service",
-	ServiceVersion: "1.0.0",
-	EnableMetrics:  true,
-	OTLPEndpoint:   "localhost:4317",
+	Env:               observability.EnvDev,
+	ServiceName:       "my-service",
+	ServiceVersion:    "1.0.0",
+	EnableMetrics:     true,
+	OTLPEndpoint:      "localhost:4317",
+	OTLPTransportType: tracing.OTLPGRPC,
 })
 if err != nil {
 	log.Fatal(err)

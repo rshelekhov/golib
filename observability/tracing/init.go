@@ -26,8 +26,8 @@ const (
 type OTLPTransportType string
 
 const (
-	OTLPGRPC OTLPTransportType = "grpc"
-	OTLPHTTP OTLPTransportType = "http"
+	OTLPTransportGRPC OTLPTransportType = "grpc"
+	OTLPTransportHTTP OTLPTransportType = "http"
 )
 
 type Config struct {
@@ -48,7 +48,7 @@ func Init(ctx context.Context, cfg Config) (*sdktrace.TracerProvider, error) {
 	switch cfg.ExporterType {
 	case ExporterOTLP:
 		switch cfg.OTLPTransportType {
-		case OTLPHTTP:
+		case OTLPTransportHTTP:
 			opts := []otlptracehttp.Option{
 				otlptracehttp.WithEndpoint(cfg.OTLPEndpoint),
 			}
@@ -60,7 +60,7 @@ func Init(ctx context.Context, cfg Config) (*sdktrace.TracerProvider, error) {
 			if err != nil {
 				return nil, fmt.Errorf("create otlp http exporter: %w", err)
 			}
-		case OTLPGRPC:
+		case OTLPTransportGRPC:
 			opts := []otlptracegrpc.Option{
 				otlptracegrpc.WithEndpoint(cfg.OTLPEndpoint),
 			}

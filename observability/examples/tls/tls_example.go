@@ -7,7 +7,6 @@ import (
 
 	"github.com/rshelekhov/golib/observability"
 	"github.com/rshelekhov/golib/observability/metrics"
-	"github.com/rshelekhov/golib/observability/tracing"
 )
 
 func main() {
@@ -35,7 +34,7 @@ func prodWithTLSExample() {
 		ServiceVersion:    "1.0.0",
 		EnableMetrics:     true,
 		OTLPEndpoint:      "otel-collector.company.com:4317",
-		OTLPTransportType: tracing.OTLPGRPC,
+		OTLPTransportType: "grpc",
 		// OTLPInsecure is false by default for production
 	})
 	if err != nil {
@@ -62,7 +61,7 @@ func prodInsecureExample() {
 		ServiceVersion:    "1.0.0",
 		EnableMetrics:     true,
 		OTLPEndpoint:      "localhost:4317", // Local OTLP collector
-		OTLPTransportType: tracing.OTLPGRPC,
+		OTLPTransportType: "grpc",
 		OTLPInsecure:      &[]bool{true}[0], // Explicitly set to insecure
 	})
 	if err != nil {
@@ -80,9 +79,9 @@ func localExample() {
 		Env:               observability.EnvLocal,
 		ServiceName:       "my-service",
 		ServiceVersion:    "1.0.0",
-		EnableMetrics:     false,            // Metrics disabled for local
-		OTLPEndpoint:      "",               // No OTLP for local
-		OTLPTransportType: tracing.OTLPGRPC, // Required for validation, but not used
+		EnableMetrics:     false,  // Metrics disabled for local
+		OTLPEndpoint:      "",     // No OTLP for local
+		OTLPTransportType: "grpc", // Changed from tracing.OTLPTransportGRPC // Required for validation, but not used
 		// OTLPInsecure is true by default for local
 	})
 	if err != nil {
@@ -105,7 +104,7 @@ func functionalOptionsExample() {
 			ServiceVersion:    "1.0.0",
 			EnableMetrics:     true,
 			OTLPEndpoint:      "secure-otel-collector.dev.company.com:4317",
-			OTLPTransportType: tracing.OTLPGRPC,
+			OTLPTransportType: "grpc",
 		},
 		observability.WithOTLPInsecure(false), // Override to use TLS
 	)
@@ -124,7 +123,7 @@ func functionalOptionsExample() {
 			ServiceVersion:    "1.0.0",
 			EnableMetrics:     true,
 			OTLPEndpoint:      "localhost:4317",
-			OTLPTransportType: tracing.OTLPGRPC,
+			OTLPTransportType: "grpc",
 		},
 		observability.WithOTLPInsecure(true), // Force insecure (not recommended for prod)
 	)
@@ -144,7 +143,7 @@ func completeExample() {
 		ServiceVersion:    "1.0.0",
 		EnableMetrics:     true,
 		OTLPEndpoint:      "localhost:4317",
-		OTLPTransportType: tracing.OTLPGRPC,
+		OTLPTransportType: "grpc",
 		// Will use insecure connection by default for dev environment
 	})
 	if err != nil {

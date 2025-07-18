@@ -47,8 +47,8 @@ func ExampleInitTracerOTLP() {
 		Env:               "production",
 		ExporterType:      tracing.ExporterOTLP,
 		OTLPEndpoint:      "otel-collector.company.com:4317",
-		OTLPTransportType: tracing.OTLPGRPC,
-		OTLPInsecure:      false, // Uses TLS (default for production)
+		OTLPTransportType: "grpc", // Changed from tracing.OTLPTransportGRPC
+		OTLPInsecure:      false,  // Uses TLS (default for production)
 	}
 	tracerProvider, err := tracing.Init(ctx, cfg)
 	if err != nil {
@@ -75,8 +75,8 @@ func ExampleInitTracerOTLPInsecure() {
 		Env:               "development",
 		ExporterType:      tracing.ExporterOTLP,
 		OTLPEndpoint:      "localhost:4317",
-		OTLPTransportType: tracing.OTLPGRPC,
-		OTLPInsecure:      true, // Uses insecure connection (default for dev)
+		OTLPTransportType: "grpc", // Changed from tracing.OTLPTransportGRPC
+		OTLPInsecure:      true,   // Uses insecure connection (default for dev)
 	}
 	tracerProvider, err := tracing.Init(ctx, cfg)
 	if err != nil {
@@ -103,8 +103,8 @@ func ExampleInitTracerOTLPHTTP() {
 		Env:               "production",
 		ExporterType:      tracing.ExporterOTLP,
 		OTLPEndpoint:      "https://otel-collector.company.com:4318",
-		OTLPTransportType: tracing.OTLPHTTP,
-		OTLPInsecure:      false, // Uses TLS (default for production)
+		OTLPTransportType: "http", // Changed from tracing.OTLPTransportHTTP
+		OTLPInsecure:      false,  // Uses TLS (default for production)
 	}
 	tracerProvider, err := tracing.Init(ctx, cfg)
 	if err != nil {

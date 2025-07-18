@@ -94,11 +94,12 @@ func localExample() {
 func prodExample() {
 	// Production with default info level
 	cfg, err := observability.NewConfig(observability.ConfigParams{
-		Env:            observability.EnvProd,
-		ServiceName:    "my-service",
-		ServiceVersion: "1.2.3",
-		EnableMetrics:  true,
-		OTLPEndpoint:   "localhost:4317",
+		Env:               observability.EnvProd,
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.2.3",
+		EnableMetrics:     true,
+		OTLPEndpoint:      "localhost:4317",
+		OTLPTransportType: "grpc",
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -187,11 +188,12 @@ func customLogLevelExample() {
 func errorHandlingExample() {
 	// This will fail - unknown environment
 	cfg, err := observability.NewConfig(observability.ConfigParams{
-		Env:            "staging",
-		ServiceName:    "my-service",
-		ServiceVersion: "1.0.0",
-		EnableMetrics:  true,
-		OTLPEndpoint:   "localhost:4317",
+		Env:               "staging",
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.0.0",
+		EnableMetrics:     true,
+		OTLPEndpoint:      "localhost:4317",
+		OTLPTransportType: "grpc",
 	})
 	if err != nil {
 		log.Printf("Expected error: %v", err)
@@ -213,11 +215,12 @@ func errorHandlingExample() {
 
 	// This will succeed
 	cfg, err = observability.NewConfig(observability.ConfigParams{
-		Env:            observability.EnvProd,
-		ServiceName:    "my-service",
-		ServiceVersion: "1.0.0",
-		EnableMetrics:  true,
-		OTLPEndpoint:   "localhost:4317",
+		Env:               observability.EnvProd,
+		ServiceName:       "my-service",
+		ServiceVersion:    "1.0.0",
+		EnableMetrics:     true,
+		OTLPEndpoint:      "localhost:4317",
+		OTLPTransportType: "grpc",
 	})
 	if err != nil {
 		log.Fatal(err)

@@ -5,6 +5,23 @@ All notable changes to the Observability package will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2025-07-18
+
+### Changed
+
+- **BREAKING**: Changed `ConfigParams.OTLPTransportType` from `tracing.OTLPTransportType` to `string`
+  - Provides more flexibility for configuration from environment variables and config files
+  - Use `"grpc"` instead of `tracing.OTLPTransportGRPC`
+  - Use `"http"` instead of `tracing.OTLPTransportHTTP`
+  - Internal `Config.OTLPTransportType` remains typed for type safety
+- **Enhanced validation**: Updated validation logic to convert string to typed constant for validation
+- **Updated conversion**: Modified `NewConfig` function to handle string-to-type conversion automatically
+
+### Fixed
+
+- **Examples**: Updated all examples to use string values for transport type configuration
+- **Tests**: Updated all test cases to use string values instead of typed constants
+
 ## [1.4.0] - 2025-07-15
 
 ### Added
