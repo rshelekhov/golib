@@ -5,6 +5,17 @@ All notable changes to the Observability package will be documented in this file
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2025-07-24
+
+### Fixed
+
+- **OTLP gRPC TLS Configuration**: Fixed TLS disabling for OTLP gRPC exporters
+  - **Tracing**: Added missing `otlptracegrpc.WithInsecure()` option for insecure connections
+  - **Logging**: Added missing `otlploggrpc.WithInsecure()` option for insecure connections
+  - **Metrics**: Already correctly configured with `otlpmetricgrpc.WithInsecure()`
+  - **Impact**: Resolves "tls: first record does not look like a TLS handshake" errors in dev/local environments
+  - **Root cause**: Previous implementation only configured dial options but didn't disable TLS at the exporter level
+
 ## [1.5.1] - 2025-07-24
 
 ### Changed

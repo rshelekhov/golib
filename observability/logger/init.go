@@ -13,8 +13,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Config struct {
@@ -59,7 +57,7 @@ func Init(ctx context.Context, cfg Config) (*log.LoggerProvider, *slog.Logger, e
 			otlploggrpc.WithEndpoint(cfg.Endpoint),
 		}
 		if cfg.OTLPInsecure {
-			opts = append(opts, otlploggrpc.WithDialOption(grpc.WithTransportCredentials(insecure.NewCredentials())))
+			opts = append(opts, otlploggrpc.WithInsecure())
 		}
 
 		exporter, err = otlploggrpc.New(ctx, opts...)
