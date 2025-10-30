@@ -5,6 +5,21 @@ All notable changes to the Server Bootstrap package will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2025-10-30
+
+### Changed
+
+- Migrated interceptors and middleware to separate middleware packages
+
+### Removed
+
+- Removed `interceptors.go` file (functionality moved to middleware packages)
+- Removed `middleware.go` file (functionality moved to middleware packages)
+
+### Added
+
+- Dependency on middleware packages for backward compatibility
+
 ## [1.1.0] - 2025-07-11
 
 ### Added
