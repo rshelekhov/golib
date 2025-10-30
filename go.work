@@ -6,6 +6,11 @@ use (
 	./db/postgres/pgxv5
 	./db/redis
 	./db/s3
+	./middleware/cors
+	./middleware/logging
+	./middleware/recovery
+	./middleware/requestid
+	./middleware/validation
 	./observability
 	./server
 )

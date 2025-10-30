@@ -8,6 +8,9 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/rshelekhov/golib/middleware/cors"
+	"github.com/rshelekhov/golib/middleware/logging"
+	"github.com/rshelekhov/golib/middleware/recovery"
 	"github.com/rshelekhov/golib/server"
 	"google.golang.org/grpc"
 )
@@ -47,17 +50,17 @@ func main() {
 		server.WithLogger(logger),
 		server.WithShutdownTimeout(time.Second*5),
 		server.WithUnaryInterceptors(
-			server.LoggingUnaryInterceptor(logger),
-			server.RecoveryUnaryInterceptor(logger),
+			logging.UnaryServerInterceptor(logger),
+			recovery.UnaryServerInterceptor(logger),
 		),
 		server.WithStreamInterceptors(
-			server.LoggingStreamInterceptor(logger),
-			server.RecoveryStreamInterceptor(logger),
+			logging.StreamServerInterceptor(logger),
+			recovery.StreamServerInterceptor(logger),
 		),
 		server.WithHTTPMiddleware(
-			server.LoggingMiddleware(logger),
-			server.RecoveryMiddleware(logger),
-			server.CORSMiddleware([]string{"*"}),
+			logging.Middleware(logger),
+			recovery.Middleware(logger),
+			cors.Middleware([]string{"*"}),
 		),
 	)
 	if err != nil {
